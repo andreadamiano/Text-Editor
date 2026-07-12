@@ -9,38 +9,35 @@ Arena_t* arena;
 
 bool insert_string(uint32_t index, uint8_t* content, uint32_t content_size)
 {
-    insert_string_into_node((Node_t*) root, -1, index, content, content_size);
-}
-
-int32_t insert_string_into_node(Node_t* node, size_t parent_position, uint32_t target_index, uint8_t* content, uint32_t content_size)
-{
+    Node_t* node = find_node_at_index(index);
+    
     if (!node)
     {
-        node = (Node_t*) request_block(arena, sizeof(LeafNode_t)); //allocate a new leaf node if it doesn't exists
-        node->is_leaf = true;   
-        node->parent_index = parent_position;
-    }
+        return false;
+    } 
 
-    if (node->is_leaf)
+    insert_string_into_node((LeafNode_t*) node, index, content, content_size);
+}
+
+int32_t insert_string_into_node(LeafNode_t* leaf_node, uint32_t target_index, uint8_t* content, uint32_t content_size)
+{
+    uint32_t total_content_size = leaf_node->base.content_size + content_size;
+    int32_t inserted_content;
+
+    if (total_content_size <= MAX_FILE_CHUNK)
     {
-        LeafNode_t* leaf_node = (LeafNode_t*) node;
-        uint32_t total_content_size = leaf_node->base.content_size + content_size;
-
-        if (total_content_size <= MAX_FILE_CHUNK)
-        {
-            memmove(leaf_node->content + target_index + content_size, leaf_node->content + target_index, leaf_node->base.content_size - target_index); //shift the content before inserting 
-            memcpy(leaf_node->content + target_index, content, content_size); //insert content
-            leaf_node->base.content_size += content_size;
-            leaf_node->base.parent->child_count += 1;
-            leaf_node->base.parent_index = parent_position;
-
-            return content_size;
-        }
-
+        memmove(leaf_node->content + target_index + content_size, leaf_node->content + target_index, leaf_node->base.content_size - target_index); //shift the content before inserting 
+        memcpy(leaf_node->content + target_index, content, content_size); //insert content
+        leaf_node->base.content_size += content_size;
+        inserted_content = content_size;
+        update_size_from_node((Node_t*) leaf_node); 
+    }
+    else
+    {
         uint16_t first_half_content_size = total_content_size / 2;
         uint16_t second_half_content_size = total_content_size - first_half_content_size;
 
-        //the idea is to compute the new total size (after insertion) and split that in half between 2 nodes
+        //the idea is to compute the new total size after insertion and split that in half between 2 nodes
         LeafNode_t* new_leaf = (LeafNode_t*) request_block(arena, sizeof(LeafNode_t));
         uint8_t tmp_buffer[2 * MAX_FILE_CHUNK];
 
@@ -49,39 +46,28 @@ int32_t insert_string_into_node(Node_t* node, size_t parent_position, uint32_t t
         memcpy(tmp_buffer + target_index + content_size, leaf_node->content + target_index, leaf_node->base.content_size - target_index); //copy the remaining half
 
         //copy half the content in the current node 
+        int16_t changed_size = first_half_content_size - leaf_node->base.content_size;
         memcpy(leaf_node->content, tmp_buffer, first_half_content_size);
-        leaf_node->base.parent->base.content_size += first_half_content_size - leaf_node->base.content_size;
-        leaf_node->base.parent->child_size[parent_position] = first_half_content_size;
         leaf_node->base.content_size = first_half_content_size;
-
+        leaf_node->base.parent->base.content_size += changed_size;
+        leaf_node->base.parent->child_size[leaf_node->base.parent_index] = changed_size; 
+        leaf_node->base.parent->children[leaf_node->base.parent_index] = (Node_t*) leaf_node; 
+        update_size_from_node((Node_t*) leaf_node->base.parent); 
 
         //copy the other half in the new leaf node
         memcpy(new_leaf->content, tmp_buffer, second_half_content_size);
         new_leaf->base.content_size = second_half_content_size;
         new_leaf->base.is_leaf = true;
 
-        return insert_child_node((Node_t*) new_leaf, node->parent, parent_position + 1);
+        inserted_content = insert_child_node((Node_t*) new_leaf, leaf_node->base.parent, leaf_node->base.parent_index + 1);
     }
 
-
-    InternalNode_t* internal_node = (InternalNode_t*) node;
-    uint32_t current_index = 0;
-
-    for (int i = 0; i < MAX_INTERNAL_NODE; ++i)
-    {
-        if (current_index <= current_index + internal_node->child_size[i] || internal_node->child_size[i] == 0)
-        {
-            insert_string_into_node(internal_node->children[i], i, target_index - current_index, content, content_size);   
-        }
-
-        current_index += internal_node->child_size[i];
-    }
-    
-    return -1;
+    return inserted_content;
 }
 
 
-InternalNode_t*  split_internal_node(InternalNode_t* node, size_t parent_position)
+
+InternalNode_t* split_internal_node(InternalNode_t* node, size_t parent_position)
 {
     InternalNode_t* right_sibling = (InternalNode_t*) request_block(arena, sizeof(InternalNode_t));
 
@@ -114,6 +100,7 @@ InternalNode_t*  split_internal_node(InternalNode_t* node, size_t parent_positio
         //update the parent
         node->base.parent->child_size[parent_position] = size_left;
         node->base.parent->base.content_size -= second_half_nodes;
+        update_size_from_node((Node_t*) node->base.parent);
     }
 
     //insert right node
@@ -145,15 +132,7 @@ size_t insert_child_node(Node_t* insert_node, InternalNode_t* parent_node, size_
     parent_node->child_size[parent_position] = 0; //initialize the new size 
 
     //bubble up updating all the parent untill the root is reached
-    Node_t* current_node = insert_node;
-    while (current_node)
-    {
-        current_node->parent->child_size[current_node->parent_index] += current_node->content_size;
-        current_node->parent->base.content_size += current_node->content_size;
-
-        //bubble up
-        current_node = (Node_t*) current_node->parent;
-    }
+    update_size_from_node(insert_node);
 
     return insert_node->content_size;
 
@@ -168,24 +147,24 @@ void init_b_tree()
 
 Node_t* find_node_at_index(uint32_t index)
 {
-    InternalNode_t* current_node;
-    InternalNode_t* prev_node;
-    current_node = root;
+    Node_t* current_node = (Node_t*) root;
+    Node_t* prev_node;
     uint32_t current_index = 0;
     int i;
 
-    while (! current_node->base.is_leaf || ! current_node)
+    start:
+    while (current_node  && ! current_node->is_leaf )
     {
         for (i = 0; i < MAX_INTERNAL_NODE; ++i)
         {
-            if (current_index <= current_index + current_node->child_size[i])
+            if (current_index <= current_index + ((InternalNode_t*) current_node)->child_size[i])
             {
                 prev_node = current_node;
-                current_node = current_node->children[i];
-                break; 
+                current_node = ((InternalNode_t*) current_node)->children[i];
+                goto start; 
             }
 
-            current_index += current_node->child_size[i];
+            current_index += ((InternalNode_t*) current_node)->child_size[i];
         }
 
         return NULL;
@@ -194,11 +173,27 @@ Node_t* find_node_at_index(uint32_t index)
     if (! current_node)
     {
         current_node = (Node_t*) request_block(arena, sizeof(Arena_t));
-        current_node->base.parent = prev_node;
-        current_node->base.is_leaf = true;
-        current_node->base.parent_index = i;
+        current_node->parent = (InternalNode_t*) prev_node;
+        current_node->is_leaf = true;
+        current_node->parent_index = i;
+        current_node->parent->child_count += 1;
+        current_node->parent->children[i] = current_node;
     }
 
     return current_node;
     
+}
+
+inline void update_size_from_node(Node_t* node)
+{
+    Node_t* current_node = node;
+    while (current_node != (Node_t*) root)
+    {
+        current_node->parent->child_size[current_node->parent_index] += current_node->content_size;
+        current_node->parent->base.content_size += current_node->content_size;
+
+        //bubble up
+        current_node = (Node_t*) current_node->parent;
+    }
+    return;
 }
