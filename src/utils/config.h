@@ -6,6 +6,7 @@
 #define GiB(n) ((uint64_t)(n) << 30) //1073741824
 
 #define MAX_FILE_NAME_LEN KiB(1)
-#define MAX_FILE_CHUNK KiB(4)
+// #define MAX_FILE_CHUNK KiB(4)
+#define MAX_FILE_CHUNK 3
 
 #endif

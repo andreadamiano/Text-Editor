@@ -1,9 +1,11 @@
 #include "arena.h"
+#include <memory.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
-Arena* init_arena(size_t reserved_size)
+Arena_t* init_arena(size_t reserved_size)
 {
-    Arena* arena = (Arena*) malloc(sizeof(Arena));
+    Arena_t* arena = (Arena_t*) malloc(sizeof(Arena_t));
 
     //align the requested size to the nearest page size multiple
     reserved_size = ((reserved_size + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
@@ -25,15 +27,14 @@ Arena* init_arena(size_t reserved_size)
     return arena;
 }
 
-void* request_block(Arena* arena, size_t size)
+void* request_block(Arena_t* arena, size_t size)
 {
     if (!arena || !size)
         return NULL; 
 
-    size_t new_offset = arena->offset + size; 
-
     //allign memory requests to 8 bytes 
-    new_offset = (new_offset + 7) & ~7;
+    size_t aligned_start = (arena->offset + 7) & ~7;
+    size_t new_offset = aligned_start + size; 
 
     if (new_offset > arena->reserved_size)
         return NULL;  
@@ -47,7 +48,7 @@ void* request_block(Arena* arena, size_t size)
 
         //clamp new memory commit size to max reserved size 
         if (new_commited_size > arena->reserved_size) 
-            new_commited_size = arena->reserved_size;
+            return NULL;
 
         size_t size_to_commit = new_commited_size - arena->commited_size;
         void* block_start_addr = arena->base_ptr + arena->commited_size;
@@ -62,17 +63,45 @@ void* request_block(Arena* arena, size_t size)
     void* memory = arena->base_ptr + arena->offset; //return the immediate next available address inside the arena
     arena->offset = new_offset; //increment offset addng the size of the newly created block
 
+    memset(memory, 0, size);
+
     return memory; 
 }
 
 
-void arena_reset(Arena* arena)
+void arena_reset(Arena_t* arena)
 {
     arena->offset = 0; //overwrite previously allocated memory
 }
 
-void free_arena(Arena* arena)
+void free_arena(Arena_t* arena)
 {
     munmap(arena->base_ptr, arena->commited_size);
     free(arena);
 }
+
+// bool reserve_memory(Arena* arena, size_t reserved_size)
+// {
+//     if (!arena)
+//     {
+//         return false;
+//     }
+
+//     //align the requested size to the nearest page size multiple
+//     reserved_size = ((reserved_size + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
+
+//     //mmap lazily reserve a range in the virtual address space of the process 
+//     void* block = mmap(NULL, reserved_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+//     if (block == MAP_FAILED) 
+//     {
+//         return false;
+//     }
+    
+//     //initialize arena
+//     arena->base_ptr = (uint64_t*)block;
+//     arena->reserved_size = reserved_size;
+//     arena->commited_size = 0;
+//     arena->offset = 0;
+
+//     return true;
+// }

@@ -4,33 +4,44 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "config.h"
+#include "arena.h"
 
-#define MAX_INTERNAL_NODE MAX_FILE_CHUNK / 12
+typedef struct InternalNode InternalNode_t;
 
-struct Node 
+typedef struct 
 {
     struct InternalNode* parent;
     bool is_leaf;
-};
+    size_t parent_index;
+    uint32_t content_size;
+}Node_t;
+
+typedef struct 
+{
+    Node_t base;
+    uint8_t* content[MAX_FILE_CHUNK]; 
+}LeafNode_t;
+
+// #define MAX_INTERNAL_NODE ((sizeof(uint8_t*) * MAX_FILE_CHUNK - sizeof(uint16_t)) / (sizeof(Node_t*) + sizeof(uint32_t)))
+#define MAX_INTERNAL_NODE 12
 
 struct InternalNode
 {
-    struct Node base;
-    void* children[MAX_INTERNAL_NODE];  //can point to another internal node or a leaf node
-    uint32_t child_size[MAX_INTERNAL_NODE];
+    Node_t base;
     uint16_t child_count;
+    uint32_t child_size[MAX_INTERNAL_NODE];
+    Node_t* children[MAX_INTERNAL_NODE]; 
 };
 
-struct LeafNode
-{
-    struct Node base;
-    uint8_t* content[MAX_FILE_CHUNK]; 
-};
+extern InternalNode_t* root; 
+extern Arena_t* arena;
 
-extern InternalNode* root; 
-
-bool insert_node(uint32_t index, uint8_t* content);
-bool insert_char_at_index(uint32_t index, uint8_t character);
-bool insert_string_at_index(uint32_t index, uint8_t* string, uint32_t length);
+bool insert_char(uint32_t index, uint8_t character);
+bool insert_string(uint32_t index, uint8_t* string, uint32_t length);
+int32_t insert_string_into_node(Node_t* node ,size_t parent_position, uint32_t target_index, uint8_t* string, uint32_t length);
+size_t insert_child_node(Node_t* insert_node, InternalNode_t* start_node, size_t parent_position);
+InternalNode_t* split_internal_node(InternalNode_t* node, size_t parent_position);
+void init_b_tree(); 
+Node_t* find_node_at_index(uint32_t index);
 
 #endif

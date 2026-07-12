@@ -12,7 +12,6 @@
       "environment": [],
       "externalConsole": false, 
       "MIMode": "gdb",
-      "miDebuggerPath": "${workspaceFolder}/scripts/gdb-sudo.sh"
     }
   ]
 }
