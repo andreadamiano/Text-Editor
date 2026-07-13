@@ -72,15 +72,26 @@ InternalNode_t* split_internal_node(InternalNode_t* node, size_t parent_position
     uint8_t first_half_nodes = MAX_CHILD_NODE / 2;
     uint8_t second_half_nodes = MAX_CHILD_NODE - first_half_nodes;
     memcpy(right_sibling->children, node->children + first_half_nodes, second_half_nodes * sizeof(Node_t*));
+    memcpy(right_sibling->child_size, node->child_size + first_half_nodes, second_half_nodes * sizeof(int32_t));
     memset(node->children + first_half_nodes, 0, second_half_nodes * sizeof(Node_t*));
+    memset(node->child_size + first_half_nodes, 0, second_half_nodes * sizeof(int32_t));
     node->child_count = first_half_nodes;
     right_sibling->child_count = second_half_nodes;
+
+    //update right sibiling's children
+    for (int i =  0; i < right_sibling->child_count; ++i)
+    {
+        right_sibling->children[i]->parent = right_sibling;
+        right_sibling->children[i]->parent_index = i;
+    }
 
     //recompute the sizes of the splitted nodes
     // TODO: vectorize this operations
     size_t size_left = 0, size_right = 0;
     for (int i = 0; i < node->child_count; i++) size_left += node->child_size[i];
     for (int i = 0; i < right_sibling->child_count; i++) size_right += right_sibling->child_size[i];
+    node->base.content_size = size_left;
+    right_sibling->base.content_size = size_right;
     
     //append the splitted node to the parent node
     if (node == root)
@@ -101,7 +112,7 @@ InternalNode_t* split_internal_node(InternalNode_t* node, size_t parent_position
     }
 
     //insert right node
-    insert_child_node((Node_t*) node, node->base.parent, node->base.parent_index + 1);
+    insert_child_node((Node_t*) right_sibling, node->base.parent, node->base.parent_index + 1);
     return right_sibling;
 }
 
@@ -114,7 +125,7 @@ size_t insert_child_node(Node_t* insert_node, InternalNode_t* parent_node, size_
     {
         InternalNode_t* right_neighbor = split_internal_node(parent_node, parent_node->base.parent_index);
 
-        if (parent_position >= MAX_CHILD_NODE / 2)
+        if (parent_position > MAX_CHILD_NODE / 2)
         {
             parent_node = right_neighbor;
             parent_position -= MAX_CHILD_NODE / 2;
@@ -129,6 +140,12 @@ size_t insert_child_node(Node_t* insert_node, InternalNode_t* parent_node, size_
     parent_node->child_count += 1;
     insert_node->parent_index = parent_position;
     insert_node->parent = parent_node;
+
+    //update parent indices
+    for (int i = parent_position + 1; i < parent_node->child_count; ++i)
+    {
+        parent_node->children[i]->parent_index = i; 
+    }
 
     //bubble up updating all the parent untill the root is reached
     update_size_from_node(insert_node, insert_node->content_size);
@@ -185,6 +202,8 @@ Node_t* find_node_at_index(uint32_t index)
 
 inline void update_size_from_node(Node_t* node, int32_t inserted_len)
 {
+    if (!inserted_len) return;
+
     Node_t* current_node = node;
     while (current_node && current_node != (Node_t*) root)
     {
