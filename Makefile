@@ -2,6 +2,7 @@ CC = gcc
 CCFLAGS = -O3 -I$(SOURCE_DIR)  
 LDFLAGS =
 DEBUGFLAGS = -g -O0
+SANFLAGS = -g -O1 -fno-omit-frame-pointer -fsanitize=address,undefined
 BUILD_DIR = build
 SOURCE_DIR = src
 
@@ -25,10 +26,14 @@ $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c Makefile
 debug: CCFLAGS += $(DEBUGFLAGS)
 debug: $(TARGET)
 
+sanitize: CCFLAGS += $(SANFLAGS)
+sanitize: LDFLAGS += -fsanitize=address,undefined
+sanitize: clean $(TARGET)
+
 run:
-	./$(TARGET)
+	./$(TARGET) ./tests/prova.txt
 
 clean:
 	rm -rf $(BUILD_DIR)
 
-.PHONY: run clean debug
+.PHONY: run clean debug sanitize

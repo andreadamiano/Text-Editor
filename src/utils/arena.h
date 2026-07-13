@@ -16,7 +16,7 @@ typedef struct
     uint64_t offset; //represent the offset from the base pointer to the end of the current allocated space
     size_t reserved_size; 
     size_t commited_size; 
-    uint64_t* base_ptr; 
+    uint8_t* base_ptr; 
 }Arena_t;
 
 

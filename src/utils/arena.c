@@ -19,7 +19,7 @@ Arena_t* init_arena(size_t reserved_size)
     }
     
     //initialize arena
-    arena->base_ptr = (uint64_t*)block;
+    arena->base_ptr = block;
     arena->reserved_size = reserved_size;
     arena->commited_size = 0;
     arena->offset = 0;
@@ -60,7 +60,7 @@ void* request_block(Arena_t* arena, size_t size)
         arena->commited_size = new_commited_size;
     }
 
-    void* memory = arena->base_ptr + arena->offset; //return the immediate next available address inside the arena
+    void* memory = arena->base_ptr + aligned_start; //return the immediate next available address inside the arena
     arena->offset = new_offset; //increment offset addng the size of the newly created block
 
     memset(memory, 0, size);
