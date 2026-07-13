@@ -22,15 +22,15 @@ typedef struct
     uint8_t content[MAX_FILE_CHUNK]; 
 }LeafNode_t;
 
-// #define MAX_INTERNAL_NODE ((MAX_FILE_CHUNK - sizeof(uint16_t)) / (sizeof(Node_t*) + sizeof(uint32_t)))
-#define MAX_INTERNAL_NODE 12
+// #define MAX_CHILD_NODE ((MAX_FILE_CHUNK - sizeof(uint16_t)) / (sizeof(Node_t*) + sizeof(uint32_t)))
+#define MAX_CHILD_NODE 3
 
 struct InternalNode
 {
     Node_t base;
     uint16_t child_count;
-    uint32_t child_size[MAX_INTERNAL_NODE];
-    Node_t* children[MAX_INTERNAL_NODE]; 
+    uint32_t child_size[MAX_CHILD_NODE];
+    Node_t* children[MAX_CHILD_NODE]; 
 };
 
 extern InternalNode_t* root; 
@@ -43,6 +43,6 @@ size_t insert_child_node(Node_t* insert_node, InternalNode_t* start_node, size_t
 InternalNode_t* split_internal_node(InternalNode_t* node, size_t parent_position);
 void init_b_tree(); 
 Node_t* find_node_at_index(uint32_t index);
-void update_size_from_node(Node_t* node);
+void update_size_from_node(Node_t* node, int32_t inserted_len);
 
 #endif

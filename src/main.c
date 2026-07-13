@@ -16,8 +16,10 @@ int main(int argc, char* argv[])
     char* string1 = "cia";
     char* string2 = "com";
     char* string3 = "va?";
+    char* string4 = "tut";
     insert_string(0, string1, 3);
     insert_string(0, string2, 3);
     insert_string(0, string3, 3);
+    insert_string(0, string4, 3);
 
 }
