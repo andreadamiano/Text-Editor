@@ -1,2 +1,19 @@
 ANSI ESCAPE:
-    - https://www.bit-101.com/2017/2022/11/ansi-escape-codes/
+    - ansi escape sequence are instruction for the terminal which will not be rendered
+    - there are controls beginning with ESC, which is the escape character: \e, \033 (octal), \x1B (hex). The syntax is composed of 2 characters: ESC + Command
+        * example: \e7 save cursor position
+    - there are control sequence introducer, which are commands that starts with a CSI = ESC + [ , every CSI command follow this syntax: CSI + Parameter + Command character
+        * example: \e[2J clears the entire screen
+    - there are no ESC commands, like:
+        * \n: line feed, which moves the cursor down a line
+        * \r : carriage return, which moves the cursor to the far left of the current line
+        * \t : tab, which moves the cursor to the next tab spot
+        * \a :bell, which makes the terminal play a system allert 
+    - There are operating system commands (OSC), which start with OSC = ESC + ]. They interact with the OS/terminal window itself and end with \a or \e\. Syntax: OSC + Parameter + ; + Text + \a 
+        * example:  \e]2;Title\a to change window title 
+    - There are device control strings (DCS), which start with DCS = ESC + P. They are used to send raw data or configuration directly to the terminal's engine and end with \e\.
+    - In CSI, OSC, and DCS, multiple parameters are always separated by a semicolon (;).
+
+    - Documentation:
+        * https://www.bit-101.com/2017/2022/11/ansi-escape-codes/
+        * https://invisible-island.net/xterm/ctlseqs/ctlseqs.html

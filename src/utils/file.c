@@ -65,8 +65,15 @@ void restore_old_terminal()
 
 void render_file_content()
 {
-    //clear the screen and move cursor to the top left position
-    printf("\e[2J\e[H");
+    //do not render for extremely small terminal window sizes 
+    if (info.terminal_size.ws_row < 1 || info.terminal_size.ws_col < 1)
+    {
+        return;
+    }
+
+    //clear the screen, clear the scrollback history and move cursor to the top left position
+    printf("\e[2J\e[3J\e[H");
+    fflush(stdout); 
 
     int32_t node_index = info.curr_index;
     LeafNode_t* current_node = (LeafNode_t*) find_node_at_index(&node_index);
@@ -78,9 +85,7 @@ void render_file_content()
         for (int col = 0; col < info.terminal_size.ws_col; ++col)
         {
             if (!current_node)
-            {
                 return;
-            }
 
             ch = current_node->content[node_index++];
 
@@ -88,7 +93,7 @@ void render_file_content()
                 break;
 
             putchar(ch);
-            fflush(stdout); //debug 
+            // fflush(stdout); //debug 
 
             if (node_index >= current_node->base.content_size)
             {
@@ -96,16 +101,28 @@ void render_file_content()
                 current_node = current_node->next;
             }
         }
+
         putchar('\n');
 
-        while ((ch = current_node->content[node_index++]) != '\n')
+        //if the current line was broken before reaching the \n was reached (becasue its bigger than the current horizontal size of the terminal) loop untill the next \n
+        while (ch != '\n')
         {
+            if (!current_node) 
+                return;
+
             if (node_index >= current_node->base.content_size)
             {
                 node_index = 0;
                 current_node = current_node->next;
             }
+            
+            if (!current_node)
+                return;
+
+            ch = current_node->content[node_index++];
         }
         
     }
+
+    fflush(stdout); 
 }
