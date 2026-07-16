@@ -79,29 +79,3 @@ void free_arena(Arena_t* arena)
     munmap(arena->base_ptr, arena->commited_size);
     free(arena);
 }
-
-// bool reserve_memory(Arena* arena, size_t reserved_size)
-// {
-//     if (!arena)
-//     {
-//         return false;
-//     }
-
-//     //align the requested size to the nearest page size multiple
-//     reserved_size = ((reserved_size + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
-
-//     //mmap lazily reserve a range in the virtual address space of the process 
-//     void* block = mmap(NULL, reserved_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-//     if (block == MAP_FAILED) 
-//     {
-//         return false;
-//     }
-    
-//     //initialize arena
-//     arena->base_ptr = (uint64_t*)block;
-//     arena->reserved_size = reserved_size;
-//     arena->commited_size = 0;
-//     arena->offset = 0;
-
-//     return true;
-// }

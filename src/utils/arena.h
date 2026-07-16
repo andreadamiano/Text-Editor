@@ -21,7 +21,6 @@ typedef struct
 
 
 void* request_block(Arena_t* arena, size_t size); 
-// bool reserve_memory(Arena_t* arena, size_t reserved_size);
 void free_arena(Arena_t* arena); 
 Arena_t* init_arena(size_t reserved_size); 
 void arena_reset(Arena_t* arena); 
