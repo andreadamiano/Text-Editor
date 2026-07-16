@@ -42,7 +42,7 @@ void put_terminal_raw()
     terminal_info.curr_row = 0;
 
     //intialize arena
-    terminal_info.scratch_arena = init_arena(KiB(4));
+    terminal_info.scratch_arena = init_arena(KiB(8));
 
 }
 
@@ -90,7 +90,10 @@ void render_file_content()
             ch = current_node->content[node_index++];
 
             if (ch == '\n')
+            {
+                terminal_info.displayed_content[content_index++] = ch;
                 break;
+            }
 
             putchar(ch);
             terminal_info.displayed_content[content_index++] = ch;
@@ -169,7 +172,7 @@ void read_input()
                         if (terminal_info.displayed_content[MAX(terminal_info.displayed_cols[terminal_info.curr_row-1] + terminal_info.curr_col - 1, 0)] == '\n')
                         {
                             terminal_info.curr_row = MAX(terminal_info.curr_row - 1, 0);
-                            terminal_info.curr_col = terminal_info.terminal_size.ws_col;
+                            terminal_info.curr_col = terminal_info.displayed_cols[terminal_info.curr_row] - terminal_info.displayed_cols[terminal_info.curr_row-1] - 1;
                             break;
                         }
 
@@ -242,4 +245,4 @@ void read_input()
             break;
     }
     
-}
+    }
