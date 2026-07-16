@@ -37,6 +37,7 @@ bool read_file_content(uint8_t* file_name)
     {
         insert_string(curr_index, file_info.read_buffer, bytes_read);
         curr_index += bytes_read;
+        file_info.file_size += bytes_read;
     }
     
 }

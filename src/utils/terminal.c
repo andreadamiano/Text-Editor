@@ -3,13 +3,13 @@
 #include "terminal.h"
 #include <stdio.h>
 #include <errno.h>
+#include <sys/param.h>
 
 terminal_info_t terminal_info;
-volatile sig_atomic_t screen_resized = 0;
 
 void handle_resize(int sig) 
 {
-    screen_resized = 1;
+    terminal_info.screen_resized = 1;
 }
 
 void register_resize_handler()
@@ -37,6 +37,13 @@ void put_terminal_raw()
     //save current terminal dimensions
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &terminal_info.terminal_size);
 
+    //initialize terminal position
+    terminal_info.curr_col = 0;
+    terminal_info.curr_row = 0;
+
+    //intialize arena
+    terminal_info.scratch_arena = init_arena(KiB(4));
+
 }
 
 void restore_old_terminal()
@@ -55,6 +62,12 @@ void render_file_content()
         return;
     }
 
+    arena_reset(terminal_info.scratch_arena);
+    terminal_info.displayed_content = request_block(terminal_info.scratch_arena, terminal_info.terminal_size.ws_col * terminal_info.terminal_size.ws_row);
+    
+    //the extra slot acts as a safe boundary check to prevent out-of-bounds bugs
+    terminal_info.displayed_cols = request_block(terminal_info.scratch_arena, terminal_info.terminal_size.ws_row+1); 
+
     //clear the screen, clear the scrollback history and move cursor to the top left position
     // printf("\e[2J\e[3J\e[H");
     printf("\e[2J\e[H");
@@ -64,13 +77,15 @@ void render_file_content()
     LeafNode_t* current_node = (LeafNode_t*) find_node_at_index(&node_index);
 
     char ch;
+    uint8_t content_index = 0;
+    uint8_t current_row = 0;
 
     for (int row = 0; row < terminal_info.terminal_size.ws_row; ++row)
     {
         for (int col = 0; col < terminal_info.terminal_size.ws_col; ++col)
         {
             if (!current_node)
-                return;
+                goto end;
 
             ch = current_node->content[node_index++];
 
@@ -78,7 +93,7 @@ void render_file_content()
                 break;
 
             putchar(ch);
-            // fflush(stdout); //debug 
+            terminal_info.displayed_content[content_index++] = ch;
 
             if (node_index >= current_node->base.content_size)
             {
@@ -93,7 +108,7 @@ void render_file_content()
         while (ch != '\n')
         {
             if (!current_node) 
-                return;
+                goto end;
 
             if (node_index >= current_node->base.content_size)
             {
@@ -102,13 +117,23 @@ void render_file_content()
             }
             
             if (!current_node)
-                return;
+                goto end;
 
             ch = current_node->content[node_index++];
+            terminal_info.displayed_content[content_index++] = ch;
         }
+
+        terminal_info.displayed_cols[current_row] = content_index;
+        current_row += 1;
         
     }
 
+    end:
+    terminal_info.displayed_content[content_index++] = '\n';
+    terminal_info.displayed_cols[current_row] = content_index;
+
+    //reset the cursor to the current position in the terminal
+    printf("\e[%d;%dH", terminal_info.curr_row + 1, terminal_info.curr_col + 1);
     fflush(stdout); 
 }
 
@@ -141,19 +166,74 @@ void read_input()
                 {   
                     //left arrow
                     case 68: 
+                        if (terminal_info.displayed_content[MAX(terminal_info.displayed_cols[terminal_info.curr_row-1] + terminal_info.curr_col - 1, 0)] == '\n')
+                        {
+                            terminal_info.curr_row = MAX(terminal_info.curr_row - 1, 0);
+                            terminal_info.curr_col = terminal_info.terminal_size.ws_col;
+                            break;
+                        }
 
+                        if (terminal_info.curr_col <= 0) 
+                        {
+                            file_info.curr_index = MAX(file_info.curr_index - 1, 0);
+                        }
+                        else
+                        {
+                            terminal_info.curr_col = MAX(terminal_info.curr_col - 1, 0);
+                        } 
+                    
                         break;
 
                     //right arrow
                     case 67:
+                        if (terminal_info.displayed_content[terminal_info.displayed_cols[terminal_info.curr_row-1] + terminal_info.curr_col] == '\n' )
+                        {
+                            if (!terminal_info.displayed_cols[terminal_info.curr_row+1])
+                                break;
+
+                            terminal_info.curr_row = MIN(terminal_info.curr_row + 1, terminal_info.terminal_size.ws_row);
+                            terminal_info.curr_col = 0;
+                            break;
+                        }
+
+
+                        if (terminal_info.curr_col >= terminal_info.terminal_size.ws_col) 
+                        {
+                            file_info.curr_index = MIN(file_info.curr_index + 1, terminal_info.terminal_size.ws_col);
+                        }
+                        else
+                        {
+                            terminal_info.curr_col = MIN(terminal_info.curr_col + 1, terminal_info.terminal_size.ws_col);
+                        } 
+
                         break;
                     
                     //up arrow
                     case 65:
+                        if (terminal_info.curr_row <= 0)
+                        {
+                            file_info.curr_index = MAX(file_info.curr_index - terminal_info.terminal_size.ws_col, file_info.curr_index);
+                        }
+                        else
+                        {
+                            terminal_info.curr_row = MAX(terminal_info.curr_row - 1, 0);
+                        } 
                         break;
                         
                     //down arrow
                     case 66: 
+                        if (terminal_info.curr_row >= terminal_info.terminal_size.ws_row)
+                        {
+                            file_info.curr_index = MIN(file_info.curr_index + terminal_info.terminal_size.ws_col, file_info.curr_index);
+                        }
+                        else
+                        {
+                            if (terminal_info.displayed_cols[terminal_info.curr_row + 1] != 0)
+                            {
+                                terminal_info.curr_row += 1;
+                                terminal_info.curr_col = MIN(terminal_info.curr_col, terminal_info.displayed_cols[terminal_info.curr_row] - terminal_info.displayed_cols[terminal_info.curr_row -1] - 1);
+                            }
+                        } 
                         break;
                 }
             }

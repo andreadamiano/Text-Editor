@@ -15,6 +15,7 @@ typedef struct
     uint8_t writing_buffer[MAX_FILE_CHUNK];
     uint8_t writing_buffer_index; 
     uint8_t read_buffer[MAX_FILE_CHUNK];
+    uint32_t file_size;
 }file_info_t;
 
 extern file_info_t file_info;

@@ -71,6 +71,9 @@ void* request_block(Arena_t* arena, size_t size)
 
 void arena_reset(Arena_t* arena)
 {
+    if (!arena)
+        return; 
+
     arena->offset = 0; //overwrite previously allocated memory
 }
 

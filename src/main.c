@@ -27,9 +27,9 @@ int main(int argc, char* argv[])
     {
         char ch;
 
-        if (screen_resized) 
+        if (terminal_info.screen_resized) 
         {
-            screen_resized = 0;
+            terminal_info.screen_resized = 0;
             ioctl(STDOUT_FILENO, TIOCGWINSZ, &terminal_info.terminal_size);
             render_file_content();
         }
