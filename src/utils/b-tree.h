@@ -45,5 +45,6 @@ InternalNode_t* init_b_tree();
 Node_t* find_node_at_index(uint32_t* index);
 void update_size_from_node(Node_t* node, int32_t inserted_len);
 void link_leaf(Node_t* node);
+uint8_t consume_char_from_node(LeafNode_t** node, int32_t* index);
 
 #endif

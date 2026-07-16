@@ -264,3 +264,17 @@ void link_leaf(Node_t* current_node)
         ((LeafNode_t*) current_node)->next->prev = (LeafNode_t*) current_node;
     }
 }
+
+uint8_t consume_char_from_node(LeafNode_t** node, int32_t* node_index)
+{
+    if (*node_index >= (*node)->base.content_size)
+    {
+        *node_index = 0;
+        *node = (*node)->next;
+    }
+
+    if(!(*node))
+        return '\0';
+
+    return (*node)->content[(*node_index)++];
+}

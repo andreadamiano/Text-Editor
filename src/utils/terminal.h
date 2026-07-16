@@ -11,10 +11,13 @@ typedef struct
 {
     struct termios orig_termios;
     struct winsize terminal_size;
-    uint8_t curr_row;
-    uint8_t curr_col; 
+    uint8_t cursor_row;
+    uint8_t cursor_col; 
+    uint8_t content_index;
+    uint8_t content_size;
     uint8_t* displayed_content;
     uint8_t* displayed_cols;
+    uint8_t row_offset;
     volatile sig_atomic_t screen_resized; //sig_atomic_t ensure that the varible is an integer type of a size that cna be accessed by the CPU in a single instruction
     Arena_t* scratch_arena;
 }terminal_info_t;
