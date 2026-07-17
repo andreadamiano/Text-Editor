@@ -88,14 +88,14 @@ void render_file_content()
         {
             if ((ch = consume_char_from_node(&current_node, &node_index)) == '\0')
                 goto end;
+
+            terminal_info.displayed_content[content_index++] = ch;
             
             if (ch == '\n')
             {
                 putchar('\n');
                 goto end_loop;
             }
-
-            terminal_info.displayed_content[content_index++] = ch;
         }
         
 
@@ -125,10 +125,9 @@ void render_file_content()
             terminal_info.displayed_content[content_index++] = ch;
         }
 
-        terminal_info.displayed_cols[current_row] = content_index;
-        current_row += 1;
-        
         end_loop:
+        terminal_info.displayed_cols[current_row] = content_index-1;
+        current_row += 1;
     }
 
     end:
@@ -173,7 +172,7 @@ void read_input()
                         if (terminal_info.content_index <= 0)
                             break;
 
-                        uint8_t prev_line_size = terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.displayed_cols[terminal_info.cursor_row-2] - 1;
+                        uint8_t prev_line_size = terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.displayed_cols[terminal_info.cursor_row-2];
 
                         if (terminal_info.displayed_content[terminal_info.content_index - 1] == '\n')
                         {
@@ -202,7 +201,7 @@ void read_input()
                         if (terminal_info.content_index >= terminal_info.content_size)
                             break;
 
-                        uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1] - 1;
+                        uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1];
 
                         if (terminal_info.displayed_content[terminal_info.content_index] == '\n' )
                         {
@@ -215,9 +214,9 @@ void read_input()
 
                         terminal_info.content_index = MIN(terminal_info.content_index + 1, terminal_info.content_size);
 
-                        if (terminal_info.cursor_col >= terminal_info.terminal_size.ws_col) 
+                        if (terminal_info.cursor_col >= terminal_info.terminal_size.ws_col - 1) 
                         {
-                            terminal_info.row_offset = MIN(terminal_info.row_offset + 1, terminal_info.terminal_size.ws_col);
+                            terminal_info.row_offset = terminal_info.row_offset + 1;
                         }
                         else
                         {
@@ -235,12 +234,12 @@ void read_input()
                         }
                         else
                         {
-                            uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1] - 1;
-                            uint8_t prev_line_size = terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.displayed_cols[terminal_info.cursor_row-2] - 1;
+                            uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1];
+                            uint8_t prev_line_size = terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.displayed_cols[terminal_info.cursor_row-2];
 
                             terminal_info.cursor_row = MAX(terminal_info.cursor_row - 1, 0);
                             terminal_info.cursor_col = MIN(terminal_info.cursor_col, prev_line_size);
-                            terminal_info.content_index -= prev_line_size;
+                            terminal_info.content_index = terminal_info.displayed_cols[terminal_info.cursor_row];
                             terminal_info.row_offset = MAX(prev_line_size - terminal_info.terminal_size.ws_col ,0);
                         } 
                         break;
@@ -257,8 +256,8 @@ void read_input()
             
                             if (terminal_info.displayed_cols[terminal_info.cursor_row + 1] != 0)
                             {
-                                uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1] - 1;
-                                uint8_t next_line_size = terminal_info.displayed_cols[terminal_info.cursor_row+1] - terminal_info.displayed_cols[terminal_info.cursor_row] - 1;
+                                uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1];
+                                uint8_t next_line_size = terminal_info.displayed_cols[terminal_info.cursor_row+1] - terminal_info.displayed_cols[terminal_info.cursor_row];
 
                                 terminal_info.cursor_row += 1;
                                 terminal_info.cursor_col = MIN(terminal_info.cursor_col, next_line_size);
