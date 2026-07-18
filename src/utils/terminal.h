@@ -20,6 +20,10 @@ typedef struct
     uint8_t row_offset;
     volatile sig_atomic_t screen_resized; //sig_atomic_t ensure that the varible is an integer type of a size that cna be accessed by the CPU in a single instruction
     Arena_t* scratch_arena;
+    uint8_t tmp_buffer[MAX_FILE_CHUNK];
+    int16_t tmp_buffer_screen_index;
+    int16_t tmp_buffer_index;
+    
 }terminal_info_t;
 
 extern terminal_info_t terminal_info;
@@ -30,6 +34,7 @@ void restore_old_terminal();
 void handle_resize(int sig);
 void register_resize_handler(); 
 void read_input(); 
+int8_t write_to_tmp_buffer(uint8_t index, uint8_t ch); 
 
 
 #endif
