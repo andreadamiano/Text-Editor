@@ -342,17 +342,25 @@ int8_t write_to_tmp_buffer(uint8_t index, uint8_t ch)
 
 void add_to_delete_buffer(uint8_t index)
 {
-    if (index - 1 >= terminal_info.tmp_buffer_screen_index && index - 1 <= terminal_info.tmp_buffer_screen_index + terminal_info.tmp_buffer_index)
+    if (terminal_info.tmp_buffer_index && (index - 1 >= terminal_info.tmp_buffer_screen_index && index - 1 <= terminal_info.tmp_buffer_screen_index + terminal_info.tmp_buffer_index))
     {   
-        memmove(terminal_info.tmp_buffer + index - 1, terminal_info.tmp_buffer + index, MAX(0, terminal_info.tmp_buffer_index - index));
+        uint8_t tmp_buffer_index = index - terminal_info.tmp_buffer_screen_index;
+        memmove(terminal_info.tmp_buffer + tmp_buffer_index - 1, terminal_info.tmp_buffer + tmp_buffer_index, MAX(0, terminal_info.tmp_buffer_index - tmp_buffer_index));
         terminal_info.tmp_buffer_index = MAX(terminal_info.tmp_buffer_index - 1, 0);
-        terminal_info.cursor_col = MAX(terminal_info.cursor_col - 1, 0);
     }
     else
     {
         delete_string(index, 1);
-        terminal_info.cursor_col = MAX(terminal_info.cursor_col - 1, 0);
-        terminal_info.content_index = MAX(terminal_info.content_index - 1, 0); 
+    }
+    
+    uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1];
+    terminal_info.cursor_col = MAX(terminal_info.cursor_col - 1, 0);
+    terminal_info.content_index = MAX(terminal_info.content_index -1, 0); 
+    terminal_info.row_offset = MAX(line_size + 1 - terminal_info.terminal_size.ws_col, 0);
+
+    if (!terminal_info.tmp_buffer_index)
+    {
+        terminal_info.tmp_buffer_screen_index  = -1;
     }
 }
 
