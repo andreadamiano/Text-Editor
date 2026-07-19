@@ -19,12 +19,12 @@ typedef struct
 typedef struct LeafNode
 {
     Node_t base;
-    uint8_t content[MAX_FILE_CHUNK]; 
+    uint8_t content[MAX_FILE_READ_CHUNK]; 
     struct LeafNode* next;  
     struct LeafNode* prev;
 }LeafNode_t;
 
-// #define MAX_CHILD_NODE ((MAX_FILE_CHUNK - sizeof(uint16_t)) / (sizeof(Node_t*) + sizeof(uint32_t)))
+// #define MAX_CHILD_NODE ((MAX_FILE_READ_CHUNK - sizeof(uint16_t)) / (sizeof(Node_t*) + sizeof(uint32_t)))
 #define MAX_CHILD_NODE 3
 
 struct InternalNode
@@ -47,5 +47,6 @@ Node_t* find_node_at_index(uint32_t* index, bool insert);
 void update_size_from_node(Node_t* node, int32_t inserted_len);
 void link_leaf(Node_t* node);
 uint8_t consume_char_from_node(LeafNode_t** node, int32_t* index);
+uint16_t consume_str_from_node(LeafNode_t** node, int32_t* index, uint16_t len, uint8_t* content);
 
 #endif

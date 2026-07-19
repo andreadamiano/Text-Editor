@@ -20,7 +20,7 @@ typedef struct
     uint8_t row_offset;
     volatile sig_atomic_t screen_resized; //sig_atomic_t ensure that the varible is an integer type of a size that cna be accessed by the CPU in a single instruction
     Arena_t* scratch_arena;
-    uint8_t tmp_buffer[MAX_FILE_CHUNK];
+    uint8_t tmp_buffer[MAX_FILE_READ_CHUNK];
     int16_t tmp_buffer_screen_index;
     int16_t tmp_buffer_index;
     

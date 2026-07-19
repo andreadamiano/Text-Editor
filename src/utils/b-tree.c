@@ -12,7 +12,7 @@ int32_t insert_string_into_node(LeafNode_t* leaf_node, uint32_t target_index, ui
     uint32_t total_content_size = leaf_node->base.content_size + content_size;
     int32_t inserted_content = 0;
 
-    if (total_content_size <= MAX_FILE_CHUNK)
+    if (total_content_size <= MAX_FILE_READ_CHUNK)
     {
         memmove(leaf_node->content + target_index + content_size, leaf_node->content + target_index, MAX(leaf_node->base.content_size - target_index, 0)); //shift the content before inserting 
         memcpy(leaf_node->content + target_index, content, content_size); //insert content  
@@ -28,9 +28,9 @@ int32_t insert_string_into_node(LeafNode_t* leaf_node, uint32_t target_index, ui
         uint16_t first_half_content_size = total_content_size / 2;
         uint16_t second_half_content_size = total_content_size - first_half_content_size;
     
-        if (total_content_size < 2 * MAX_FILE_CHUNK || target_index < MAX_FILE_CHUNK )
+        if (total_content_size < 2 * MAX_FILE_READ_CHUNK || target_index < MAX_FILE_READ_CHUNK )
         {
-            uint8_t tmp_buffer[2 * MAX_FILE_CHUNK];
+            uint8_t tmp_buffer[2 * MAX_FILE_READ_CHUNK];
 
             memcpy(tmp_buffer, leaf_node->content, target_index); //copy the first half
             memcpy(tmp_buffer + target_index, content, content_size); //copy the new content
@@ -284,6 +284,18 @@ uint8_t consume_char_from_node(LeafNode_t** node, int32_t* node_index)
     return (*node)->content[(*node_index)++];
 }
 
+uint16_t consume_str_from_node(LeafNode_t** node, int32_t* index, uint16_t len, uint8_t* content)
+{
+    uint8_t ch; 
+    uint16_t current_index = 0; 
+    while ((current_index < len && (ch = consume_char_from_node(node, index)) != '\0'))
+    {
+        memcpy(content + current_index++, &ch, 1);
+    }
+    return current_index;
+    
+}
+
 void delete_string_from_node(LeafNode_t* node, uint32_t target_index, uint32_t delete_size)
 {
     uint32_t deleted_size =0;
@@ -294,7 +306,7 @@ void delete_string_from_node(LeafNode_t* node, uint32_t target_index, uint32_t d
         node->base.content_size = MAX(node->base.content_size - delete_size, 0);
 
         //shift content to replace the deleted content
-        memmove(node->content + target_index, node->content + MIN(target_index + delete_size, MAX_FILE_CHUNK -1), node->base.content_size);
+        memmove(node->content + target_index, node->content + MIN(target_index + delete_size, MAX_FILE_READ_CHUNK -1), node->base.content_size);
 
         update_size_from_node((Node_t*) node, -deleted_size);
 

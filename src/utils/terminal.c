@@ -295,6 +295,12 @@ void read_input()
             add_to_delete_buffer(terminal_info.content_index);
             break;
 
+        //ctrl+s
+        case 19:
+            insert_string(terminal_info.tmp_buffer_screen_index + file_info.curr_index, terminal_info.tmp_buffer, terminal_info.tmp_buffer_index); //flush to the b-tree
+            write_to_disk();
+            break;
+
         default:
             write_to_tmp_buffer(terminal_info.content_index, ch);
             break;
@@ -312,7 +318,7 @@ int8_t write_to_tmp_buffer(uint8_t index, uint8_t ch)
     }
     else
     {
-        if (index > terminal_info.tmp_buffer_index + terminal_info.tmp_buffer_screen_index || terminal_info.tmp_buffer_index + 1 > MAX_FILE_CHUNK)
+        if (index > terminal_info.tmp_buffer_index + terminal_info.tmp_buffer_screen_index || terminal_info.tmp_buffer_index + 1 > MAX_FILE_READ_CHUNK)
         {
             insert_string(terminal_info.tmp_buffer_screen_index + file_info.curr_index, terminal_info.tmp_buffer, terminal_info.tmp_buffer_index);
             terminal_info.tmp_buffer_screen_index = index;
@@ -322,7 +328,7 @@ int8_t write_to_tmp_buffer(uint8_t index, uint8_t ch)
         else
         {
             uint8_t tmp_buffer_index = index - terminal_info.tmp_buffer_screen_index;
-            memmove(terminal_info.tmp_buffer + tmp_buffer_index + 1, terminal_info.tmp_buffer + tmp_buffer_index, MIN(MAX_FILE_CHUNK - 1 - tmp_buffer_index, terminal_info.tmp_buffer_index - tmp_buffer_index));
+            memmove(terminal_info.tmp_buffer + tmp_buffer_index + 1, terminal_info.tmp_buffer + tmp_buffer_index, MIN(MAX_FILE_READ_CHUNK - 1 - tmp_buffer_index, terminal_info.tmp_buffer_index - tmp_buffer_index));
             terminal_info.tmp_buffer[tmp_buffer_index] = ch;
             ++terminal_info.tmp_buffer_index;
         }

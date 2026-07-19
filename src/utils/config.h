@@ -8,8 +8,10 @@
 #define GiB(n) ((uint64_t)(n) << 30) //1073741824
 
 #define MAX_FILE_NAME_LEN KiB(1)
-// #define MAX_FILE_CHUNK KiB(4)
-#define MAX_FILE_CHUNK 3
+// #define MAX_FILE_READ_CHUNK KiB(4)
+#define MAX_FILE_READ_CHUNK 3
+// #define MAX_FILE_WRITE_CHUNK KiB(64)
+#define MAX_FILE_WRITE_CHUNK 4
 
 
 extern volatile bool running;
