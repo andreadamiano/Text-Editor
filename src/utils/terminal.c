@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <sys/param.h>
+#include <memory.h>
 
 terminal_info_t terminal_info;
 
@@ -84,7 +85,7 @@ void render_file_content()
     printf("\e[2J\e[H");
 
     int32_t node_index = file_info.curr_index;
-    LeafNode_t* current_node = (LeafNode_t*) find_node_at_index(&node_index);
+    LeafNode_t* current_node = (LeafNode_t*) find_node_at_index(&node_index, false);
 
     char ch;
     uint8_t content_index = 0;
@@ -311,7 +312,7 @@ int8_t write_to_tmp_buffer(uint8_t index, uint8_t ch)
     }
     else
     {
-        if (index > terminal_info.tmp_buffer_index + 1 || terminal_info.tmp_buffer_index + 1 > MAX_FILE_CHUNK)
+        if (index > terminal_info.tmp_buffer_index + terminal_info.tmp_buffer_screen_index || terminal_info.tmp_buffer_index + 1 > MAX_FILE_CHUNK)
         {
             insert_string(terminal_info.tmp_buffer_screen_index + file_info.curr_index, terminal_info.tmp_buffer, terminal_info.tmp_buffer_index);
             terminal_info.tmp_buffer_screen_index = index;
@@ -320,7 +321,10 @@ int8_t write_to_tmp_buffer(uint8_t index, uint8_t ch)
         }
         else
         {
-            terminal_info.tmp_buffer[terminal_info.tmp_buffer_index++] = ch;
+            uint8_t tmp_buffer_index = index - terminal_info.tmp_buffer_screen_index;
+            memmove(terminal_info.tmp_buffer + tmp_buffer_index + 1, terminal_info.tmp_buffer + tmp_buffer_index, MIN(MAX_FILE_CHUNK - 1 - tmp_buffer_index, terminal_info.tmp_buffer_index - tmp_buffer_index));
+            terminal_info.tmp_buffer[tmp_buffer_index] = ch;
+            ++terminal_info.tmp_buffer_index;
         }
     }
     uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1];
@@ -332,7 +336,7 @@ int8_t write_to_tmp_buffer(uint8_t index, uint8_t ch)
 
 void add_to_delete_buffer(uint8_t index)
 {
-    delete_string(index - 1, 1);
+    delete_string(index, 1);
     terminal_info.cursor_col = MAX(terminal_info.cursor_col - 1, 0);
     terminal_info.content_index = MAX(terminal_info.content_index - 1, 0); 
 }

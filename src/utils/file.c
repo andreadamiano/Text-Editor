@@ -12,7 +12,7 @@ bool insert_char(uint32_t index, uint8_t character)
 
 bool insert_string(uint32_t index, uint8_t* content, uint32_t content_size)
 {
-    Node_t* node = find_node_at_index(&index);
+    Node_t* node = find_node_at_index(&index, true);
     
     if (!node)
     {
@@ -24,14 +24,14 @@ bool insert_string(uint32_t index, uint8_t* content, uint32_t content_size)
 
 bool delete_string(uint32_t start_index, uint32_t lenght)
 {
-    Node_t* node = find_node_at_index(&start_index);
+    Node_t* node = find_node_at_index(&start_index, false);
     
-    if (!node)
+    if (!node || !start_index)
     {
         return false;
     } 
 
-    delete_string_from_node((LeafNode_t*) node, start_index, lenght);
+    delete_string_from_node((LeafNode_t*) node, start_index-1, lenght);
     return true;
 }
 

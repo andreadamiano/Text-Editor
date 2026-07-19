@@ -166,7 +166,7 @@ InternalNode_t* init_b_tree()
     return root;
 }
 
-Node_t* find_node_at_index(uint32_t* index)
+Node_t* find_node_at_index(uint32_t* index, bool insert)
 {
     Node_t* current_node = (Node_t*) root;
     Node_t* prev_node;
@@ -178,7 +178,7 @@ Node_t* find_node_at_index(uint32_t* index)
         for (i = 0; i < MAX_CHILD_NODE; ++i)
         {
             // if (*index <=  ((InternalNode_t*) current_node)->child_size[i] || ((InternalNode_t*) current_node)->child_size[i] == 0)
-            if (!((InternalNode_t*) current_node)->children[i] || (*index <=  ((InternalNode_t*) current_node)->child_size[i] && ((InternalNode_t*) current_node)->children[i]->content_size) )
+            if (!((InternalNode_t*) current_node)->children[i] || (*index <=  ((InternalNode_t*) current_node)->child_size[i] && (((InternalNode_t*) current_node)->children[i]->content_size || insert)) )
             {
                 prev_node = current_node;
                 current_node = ((InternalNode_t*) current_node)->children[i];
@@ -187,6 +187,8 @@ Node_t* find_node_at_index(uint32_t* index)
 
             *index -= ((InternalNode_t*) current_node)->child_size[i];
         }
+        
+        return NULL;
 
     }
 
@@ -270,7 +272,7 @@ void link_leaf(Node_t* current_node)
 
 uint8_t consume_char_from_node(LeafNode_t** node, int32_t* node_index)
 {
-    if (*node_index >= (*node)->base.content_size)
+    while (*node && (*node_index >= (*node)->base.content_size || !(*node)->base.content_size))
     {
         *node_index = 0;
         *node = (*node)->next;
@@ -292,7 +294,7 @@ void delete_string_from_node(LeafNode_t* node, uint32_t target_index, uint32_t d
         node->base.content_size = MAX(node->base.content_size - delete_size, 0);
 
         //shift content to replace the deleted content
-        memmove(node->content + target_index, node->content + target_index + delete_size, node->base.content_size);
+        memmove(node->content + target_index, node->content + MIN(target_index + delete_size, MAX_FILE_CHUNK -1), node->base.content_size);
 
         update_size_from_node((Node_t*) node, -deleted_size);
 
