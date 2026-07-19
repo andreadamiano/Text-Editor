@@ -110,15 +110,7 @@ void render_file_content()
 
         for (int col = 0; col < terminal_info.terminal_size.ws_col; ++col)
         {
-            if ((ch = consume_char_from_node(&current_node, &node_index)) == '\0')
-                goto end;
-
-            if (ch == '\n')
-            {
-                terminal_info.displayed_content[content_index++] = ch;
-                break;
-            }
-
+            //display tmp buffer
             if (content_index == terminal_info.tmp_buffer_screen_index)
             {
                 for (int i = 0; i < terminal_info.tmp_buffer_index; ++i)
@@ -126,6 +118,15 @@ void render_file_content()
                     putchar(terminal_info.tmp_buffer[i]);
                     content_index++;
                 }
+            }
+
+            if ((ch = consume_char_from_node(&current_node, &node_index)) == '\0')
+                goto end;
+
+            if (ch == '\n')
+            {
+                terminal_info.displayed_content[content_index++] = ch;
+                break;
             }
             
             putchar(ch);
@@ -287,6 +288,11 @@ void read_input()
                 }
             }
             break;
+        
+        //delete button
+        case 127:
+            add_to_delete_buffer(terminal_info.content_index);
+            break;
 
         default:
             write_to_tmp_buffer(terminal_info.content_index, ch);
@@ -305,7 +311,7 @@ int8_t write_to_tmp_buffer(uint8_t index, uint8_t ch)
     }
     else
     {
-        if (index > terminal_info.tmp_buffer_screen_index + 1)
+        if (index > terminal_info.tmp_buffer_index + 1 || terminal_info.tmp_buffer_index + 1 > MAX_FILE_CHUNK)
         {
             insert_string(terminal_info.tmp_buffer_screen_index + file_info.curr_index, terminal_info.tmp_buffer, terminal_info.tmp_buffer_index);
             terminal_info.tmp_buffer_screen_index = index;
@@ -322,4 +328,11 @@ int8_t write_to_tmp_buffer(uint8_t index, uint8_t ch)
     terminal_info.cursor_col = MIN(terminal_info.cursor_col + 1, terminal_info.terminal_size.ws_col);
     terminal_info.content_index += 1;
     terminal_info.row_offset = MAX(line_size + 1 - terminal_info.terminal_size.ws_col, 0);
+}
+
+void add_to_delete_buffer(uint8_t index)
+{
+    delete_string(index - 1, 1);
+    terminal_info.cursor_col = MAX(terminal_info.cursor_col - 1, 0);
+    terminal_info.content_index = MAX(terminal_info.content_index - 1, 0); 
 }

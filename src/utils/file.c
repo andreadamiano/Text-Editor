@@ -22,6 +22,19 @@ bool insert_string(uint32_t index, uint8_t* content, uint32_t content_size)
     insert_string_into_node((LeafNode_t*) node, index, content, content_size);
 }
 
+bool delete_string(uint32_t start_index, uint32_t lenght)
+{
+    Node_t* node = find_node_at_index(&start_index);
+    
+    if (!node)
+    {
+        return false;
+    } 
+
+    delete_string_from_node((LeafNode_t*) node, start_index, lenght);
+    return true;
+}
+
 bool read_file_content(uint8_t* file_name)
 {
     if (!file_info.content_root)

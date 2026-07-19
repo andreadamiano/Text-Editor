@@ -10,7 +10,7 @@ Arena_t* arena;
 int32_t insert_string_into_node(LeafNode_t* leaf_node, uint32_t target_index, uint8_t* content, uint32_t content_size)
 {
     uint32_t total_content_size = leaf_node->base.content_size + content_size;
-    int32_t inserted_content;
+    int32_t inserted_content = 0;
 
     if (total_content_size <= MAX_FILE_CHUNK)
     {
@@ -27,10 +27,11 @@ int32_t insert_string_into_node(LeafNode_t* leaf_node, uint32_t target_index, ui
         //the idea is to compute the new total size after insertion and split that in half between 2 nodes
         uint16_t first_half_content_size = total_content_size / 2;
         uint16_t second_half_content_size = total_content_size - first_half_content_size;
-        uint8_t tmp_buffer[2 * MAX_FILE_CHUNK];
-
-        if (total_content_size < 2 * MAX_FILE_CHUNK)
+    
+        if (total_content_size < 2 * MAX_FILE_CHUNK || target_index < MAX_FILE_CHUNK )
         {
+            uint8_t tmp_buffer[2 * MAX_FILE_CHUNK];
+
             memcpy(tmp_buffer, leaf_node->content, target_index); //copy the first half
             memcpy(tmp_buffer + target_index, content, content_size); //copy the new content
             memcpy(tmp_buffer + target_index + content_size, leaf_node->content + target_index, leaf_node->base.content_size - target_index); //copy the remaining half
@@ -48,6 +49,7 @@ int32_t insert_string_into_node(LeafNode_t* leaf_node, uint32_t target_index, ui
         }
         else
         {
+            //copy content inside the new leaf
             memcpy(new_leaf->content, content, content_size);
             new_leaf->base.content_size = content_size;
             new_leaf->base.is_leaf = true;
@@ -75,7 +77,7 @@ InternalNode_t* split_internal_node(InternalNode_t* node, size_t parent_position
     node->child_count = first_half_nodes;
     right_sibling->child_count = second_half_nodes;
 
-    //update right sibiling's children
+    //update moved children to point to the right sibiling
     for (int i =  0; i < right_sibling->child_count; ++i)
     {
         right_sibling->children[i]->parent = right_sibling;
@@ -104,8 +106,8 @@ InternalNode_t* split_internal_node(InternalNode_t* node, size_t parent_position
     {
         //update the size of the parents
         node->base.parent->child_size[parent_position] = size_left;
-        node->base.parent->base.content_size -= second_half_nodes;
-        update_size_from_node((Node_t*) node->base.parent, -second_half_nodes);
+        node->base.parent->base.content_size -= size_right;
+        update_size_from_node((Node_t*) node->base.parent, -size_right);
     }
 
     //insert right node
@@ -175,7 +177,8 @@ Node_t* find_node_at_index(uint32_t* index)
     {
         for (i = 0; i < MAX_CHILD_NODE; ++i)
         {
-            if (*index <=  ((InternalNode_t*) current_node)->child_size[i] || ((InternalNode_t*) current_node)->child_size[i] == 0)
+            // if (*index <=  ((InternalNode_t*) current_node)->child_size[i] || ((InternalNode_t*) current_node)->child_size[i] == 0)
+            if (!((InternalNode_t*) current_node)->children[i] || (*index <=  ((InternalNode_t*) current_node)->child_size[i] && ((InternalNode_t*) current_node)->children[i]->content_size) )
             {
                 prev_node = current_node;
                 current_node = ((InternalNode_t*) current_node)->children[i];
@@ -223,12 +226,12 @@ inline void update_size_from_node(Node_t* node, int32_t inserted_len)
 
 void link_leaf(Node_t* current_node)
 {
-    if (current_node->parent_index > 0)
+    if (current_node->parent_index > 0) //connect left child
     {
         ((LeafNode_t*) current_node)->prev = (LeafNode_t*) current_node->parent->children[current_node->parent_index - 1];
         
     }
-    else if (current_node->parent->base.parent_index > 0) //connect the cousin
+    else if (current_node->parent->base.parent_index > 0) //connect left cousin
     {
         InternalNode_t* grandparent = current_node->parent->base.parent;
         InternalNode_t* left_uncle = (InternalNode_t*) grandparent->children[current_node->parent->base.parent_index - 1];
@@ -239,16 +242,16 @@ void link_leaf(Node_t* current_node)
         }
     }
 
-    if (((LeafNode_t*) current_node)->prev)
+    if (((LeafNode_t*) current_node)->prev) //if prev node was found connect it with current node
     {
         ((LeafNode_t*) current_node)->prev->next = (LeafNode_t*) current_node;
     }
 
-    if (current_node->parent_index + 1 < current_node->parent->child_count)
+    if (current_node->parent_index + 1 < current_node->parent->child_count) //connect right child
     {
         ((LeafNode_t*) current_node)->next = (LeafNode_t*) current_node->parent->children[current_node->parent_index + 1];
     }
-    else if (current_node->parent->base.parent && current_node->parent->base.parent_index + 1 < current_node->parent->base.parent->child_count) //connect the cousin
+    else if (current_node->parent->base.parent && current_node->parent->base.parent_index + 1 < current_node->parent->base.parent->child_count) //connect right cousin
     {
         InternalNode_t* grand_parent = current_node->parent->base.parent;
         InternalNode_t* right_uncle = (InternalNode_t*) grand_parent->children[current_node->parent->base.parent_index + 1];
@@ -259,7 +262,7 @@ void link_leaf(Node_t* current_node)
         }
     }
 
-    if (((LeafNode_t*) current_node)->next)
+    if (((LeafNode_t*) current_node)->next) //if next node was found connect it back with current node 
     {
         ((LeafNode_t*) current_node)->next->prev = (LeafNode_t*) current_node;
     }
@@ -277,4 +280,25 @@ uint8_t consume_char_from_node(LeafNode_t** node, int32_t* node_index)
         return '\0';
 
     return (*node)->content[(*node_index)++];
+}
+
+void delete_string_from_node(LeafNode_t* node, uint32_t target_index, uint32_t delete_size)
+{
+    uint32_t deleted_size =0;
+
+    while ((delete_size - deleted_size) && node)
+    {
+        deleted_size = MIN(delete_size, node->base.content_size);
+        node->base.content_size = MAX(node->base.content_size - delete_size, 0);
+
+        //shift content to replace the deleted content
+        memmove(node->content + target_index, node->content + target_index + delete_size, node->base.content_size);
+
+        update_size_from_node((Node_t*) node, -deleted_size);
+
+        node = node->next;
+        delete_size -= deleted_size;
+        deleted_size = 0;
+    }
+
 }

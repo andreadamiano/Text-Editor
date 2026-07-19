@@ -39,6 +39,7 @@ extern InternalNode_t* root;
 extern Arena_t* arena;
 
 int32_t insert_string_into_node(LeafNode_t* node, uint32_t target_index, uint8_t* content, uint32_t content_size);
+void delete_string_from_node(LeafNode_t* node, uint32_t target_index, uint32_t delete_size);
 size_t insert_child_node(Node_t* insert_node, InternalNode_t* start_node, size_t parent_position);
 InternalNode_t* split_internal_node(InternalNode_t* node, size_t parent_position);
 InternalNode_t* init_b_tree(); 

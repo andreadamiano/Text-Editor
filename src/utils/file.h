@@ -23,5 +23,6 @@ extern file_info_t file_info;
 bool read_file_content(uint8_t* file_name);  
 bool insert_char(uint32_t index, uint8_t character);
 bool insert_string(uint32_t index, uint8_t* string, uint32_t length);
+bool delete_string(uint32_t start_index, uint32_t lenght);
 
 #endif
