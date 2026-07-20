@@ -31,7 +31,7 @@ sanitize: LDFLAGS += -fsanitize=address,undefined
 sanitize: clean $(TARGET)
 
 run:
-	./$(TARGET) ./tests/prova3.txt
+	./$(TARGET) ./tests/prova4.txt
 
 clean:
 	rm -rf $(BUILD_DIR)

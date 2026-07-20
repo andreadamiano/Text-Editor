@@ -228,6 +228,8 @@ inline void update_size_from_node(Node_t* node, int32_t inserted_len)
 
 void link_leaf(Node_t* current_node)
 {
+    LeafNode_t* right_child = NULL;
+
     if (current_node->parent_index > 0) //connect left child
     {
         ((LeafNode_t*) current_node)->prev = (LeafNode_t*) current_node->parent->children[current_node->parent_index - 1];
@@ -246,6 +248,7 @@ void link_leaf(Node_t* current_node)
 
     if (((LeafNode_t*) current_node)->prev) //if prev node was found connect it with current node
     {
+        right_child = ((LeafNode_t*) current_node)->prev->next;
         ((LeafNode_t*) current_node)->prev->next = (LeafNode_t*) current_node;
     }
 
@@ -268,6 +271,12 @@ void link_leaf(Node_t* current_node)
     {
         ((LeafNode_t*) current_node)->next->prev = (LeafNode_t*) current_node;
     }
+    else if (right_child)  //if the current node doesnt have neither a cousin or a sibiling then connect the left child's right sibiling
+    {
+        ((LeafNode_t*) current_node)->next = right_child;
+        right_child->prev = (LeafNode_t*) current_node;
+    }
+    
 }
 
 uint8_t consume_char_from_node(LeafNode_t** node, int32_t* node_index)
@@ -296,22 +305,22 @@ uint16_t consume_str_from_node(LeafNode_t** node, int32_t* index, uint16_t len, 
     
 }
 
-void delete_string_from_node(LeafNode_t* node, uint32_t target_index, uint32_t delete_size)
+void delete_string_from_node(LeafNode_t* node, uint32_t end_index, uint32_t delete_size)
 {
     uint32_t deleted_size =0;
 
     while ((delete_size - deleted_size) && node)
     {
         deleted_size = MIN(delete_size, node->base.content_size);
-        node->base.content_size = MAX(node->base.content_size - delete_size, 0);
+        node->base.content_size = MAX((int32_t) node->base.content_size - deleted_size, 0);
 
         //shift content to replace the deleted content
-        memmove(node->content + target_index, node->content + MIN(target_index + delete_size, MAX_FILE_READ_CHUNK -1), node->base.content_size);
-
+        memmove(node->content + MAX((int32_t)(end_index - deleted_size + 1), 0), node->content + MIN(end_index + 1, node->base.content_size - 1), MAX((int32_t)(node->base.content_size - end_index - 1), 0));
         update_size_from_node((Node_t*) node, -deleted_size);
 
-        node = node->next;
+        node = node->prev;
         delete_size -= deleted_size;
+        end_index = node->base.content_size - 1;
         deleted_size = 0;
     }
 

@@ -6,7 +6,7 @@
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/build/main",
-      "args": ["./tests/prova3.txt"],
+      "args": ["./tests/prova4.txt"],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
       "environment": [],

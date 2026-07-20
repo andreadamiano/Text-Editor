@@ -37,5 +37,6 @@ void read_input();
 int8_t write_to_tmp_buffer(uint8_t index, uint8_t ch); 
 void add_to_delete_buffer(uint8_t index); 
 void flush_tmp_buffer();
+int get_utf8_char_length(uint8_t ch);
 
 #endif

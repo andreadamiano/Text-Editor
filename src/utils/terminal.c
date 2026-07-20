@@ -47,7 +47,7 @@ void put_terminal_raw()
     terminal_info.tmp_buffer_screen_index = -1;
 
     //intialize arena
-    terminal_info.scratch_arena = init_arena(KiB(8));
+    terminal_info.scratch_arena = init_arena(KiB(24));
 
     //put terminal in full buffered mode (to avoid flushing when printing a newline)
     setvbuf(stdout, NULL, _IOFBF, BUFSIZ);
@@ -75,7 +75,7 @@ void render_file_content()
     }
 
     arena_reset(terminal_info.scratch_arena);
-    terminal_info.displayed_content = request_block(terminal_info.scratch_arena, terminal_info.terminal_size.ws_col * terminal_info.terminal_size.ws_row);
+    terminal_info.displayed_content = request_block(terminal_info.scratch_arena, (terminal_info.terminal_size.ws_col * terminal_info.terminal_size.ws_row) * 4); //ensure UTF-8 safety
     
     //the extra slot acts as a safe boundary check to prevent out-of-bounds bugs
     terminal_info.displayed_cols = request_block(terminal_info.scratch_arena, terminal_info.terminal_size.ws_row+1); 
@@ -107,9 +107,9 @@ void render_file_content()
                 goto end_loop;
             }
         }
-        
 
-        for (int col = 0; col < terminal_info.terminal_size.ws_col; ++col)
+        int col = 0;        
+        while (col < terminal_info.terminal_size.ws_col)
         {
             //display tmp buffer
             if (content_index == terminal_info.tmp_buffer_screen_index)
@@ -117,7 +117,12 @@ void render_file_content()
                 for (int i = 0; i < terminal_info.tmp_buffer_index; ++i)
                 {
                     putchar(terminal_info.tmp_buffer[i]);
-                    content_index++;
+                    terminal_info.displayed_content[content_index++] = terminal_info.tmp_buffer[i];
+
+                    if ((terminal_info.tmp_buffer[i] & 0xC0) != 0x80) 
+                    {
+                        col++;
+                    }
                 }
             }
 
@@ -132,6 +137,12 @@ void render_file_content()
             
             putchar(ch);
             terminal_info.displayed_content[content_index++] = ch;
+
+            //if it is a UTF-8 continuation byte, do not increment the column counter
+            if ((ch & 0xC0) != 0x80) 
+            {
+                col++;
+            } 
         }
 
         putchar('\n');
@@ -189,12 +200,26 @@ void read_input()
                 {   
                     //left arrow
                     case 68: 
+                    {
                         if (terminal_info.content_index <= 0)
                             break;
 
                         uint8_t prev_line_size = terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.displayed_cols[terminal_info.cursor_row-2];
+                        int char_len = 0;
+                        char current_char;
+                        
+                        while (terminal_info.content_index > 0)
+                        {
+                            current_char = terminal_info.displayed_content[--terminal_info.content_index];
+                            ++char_len;
 
-                        if (terminal_info.displayed_content[terminal_info.content_index - 1] == '\n')
+                            if ((current_char & 0xC0) != 0x80) 
+                            {
+                                break;
+                            }
+                        }
+
+                        if (current_char == '\n')
                         {
                             terminal_info.cursor_row = MAX(terminal_info.cursor_row - 1, 0);
                             terminal_info.cursor_col = MIN(prev_line_size, terminal_info.terminal_size.ws_col);
@@ -203,7 +228,7 @@ void read_input()
                             break;
                         }
 
-                        terminal_info.content_index = MAX(terminal_info.content_index - 1, 0);
+                        // terminal_info.content_index = MAX(terminal_info.content_index - 1, 0);
 
                         if (terminal_info.cursor_col <= 0) 
                         {
@@ -215,24 +240,26 @@ void read_input()
                         } 
                     
                         break;
-
+                    }
                     //right arrow
                     case 67:
                         if (terminal_info.content_index >= terminal_info.content_size)
                             break;
 
                         uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1];
+                        char current_char = terminal_info.displayed_content[terminal_info.content_index];
+                        int char_len = get_utf8_char_length(current_char);
 
-                        if (terminal_info.displayed_content[terminal_info.content_index] == '\n' )
+                        if (current_char == '\n' )
                         {
                             terminal_info.row_offset = 0;
                             terminal_info.cursor_row +=  1;
                             terminal_info.cursor_col = 0;
-                            terminal_info.content_index = MIN(terminal_info.content_index + 1, terminal_info.content_size);
+                            terminal_info.content_index = MIN(terminal_info.content_index + char_len, terminal_info.content_size);
                             break;
                         }
 
-                        terminal_info.content_index = MIN(terminal_info.content_index + 1, terminal_info.content_size);
+                        terminal_info.content_index = MIN(terminal_info.content_index + char_len, terminal_info.content_size);
 
                         if (terminal_info.cursor_col >= terminal_info.terminal_size.ws_col - 1) 
                         {
@@ -334,28 +361,48 @@ int8_t write_to_tmp_buffer(uint8_t index, uint8_t ch)
         }
     }
     uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1];
-
-    terminal_info.cursor_col = MIN(terminal_info.cursor_col + 1, terminal_info.terminal_size.ws_col);
     terminal_info.content_index += 1;
-    terminal_info.row_offset = MAX(line_size + 1 - terminal_info.terminal_size.ws_col, 0);
+    
+    if ((ch & 0xC0) != 0x80) 
+    {
+        terminal_info.cursor_col = MIN(terminal_info.cursor_col + 1, terminal_info.terminal_size.ws_col);
+        terminal_info.row_offset = MAX(line_size + 1 - terminal_info.terminal_size.ws_col, 0);
+    }
 }
 
 void add_to_delete_buffer(uint8_t index)
 {
+    char current_char;
+    int char_len = 0;
+    while (terminal_info.content_index > 0)
+    {
+        current_char = terminal_info.displayed_content[--terminal_info.content_index];
+        ++char_len;
+
+        if ((current_char & 0xC0) != 0x80) 
+        {
+            break;
+        }
+    }
+
     if (terminal_info.tmp_buffer_index && (index - 1 >= terminal_info.tmp_buffer_screen_index && index - 1 <= terminal_info.tmp_buffer_screen_index + terminal_info.tmp_buffer_index))
     {   
+        int remove_len = MIN(char_len, terminal_info.tmp_buffer_index);
         uint8_t tmp_buffer_index = index - terminal_info.tmp_buffer_screen_index;
-        memmove(terminal_info.tmp_buffer + tmp_buffer_index - 1, terminal_info.tmp_buffer + tmp_buffer_index, MAX(0, terminal_info.tmp_buffer_index - tmp_buffer_index));
-        terminal_info.tmp_buffer_index = MAX(terminal_info.tmp_buffer_index - 1, 0);
-    }
-    else
-    {
-        delete_string(index, 1);
+        memmove(terminal_info.tmp_buffer + tmp_buffer_index - remove_len, terminal_info.tmp_buffer + tmp_buffer_index, MAX(0, terminal_info.tmp_buffer_index - tmp_buffer_index));
+        terminal_info.tmp_buffer_index = MAX(terminal_info.tmp_buffer_index - remove_len, 0);
+        char_len -= remove_len;
+        index -= remove_len;
     }
     
-    uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1];
+    if (char_len)
+    {
+        delete_string(index, char_len);
+    }
+    
+    uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1] - char_len;
     terminal_info.cursor_col = MAX(terminal_info.cursor_col - 1, 0);
-    terminal_info.content_index = MAX(terminal_info.content_index -1, 0); 
+    // terminal_info.content_index = MAX(terminal_info.content_index -1, 0); 
     terminal_info.row_offset = MAX(line_size + 1 - terminal_info.terminal_size.ws_col, 0);
 
     if (!terminal_info.tmp_buffer_index)
@@ -369,4 +416,26 @@ void flush_tmp_buffer()
     insert_string(terminal_info.tmp_buffer_screen_index + file_info.curr_index, terminal_info.tmp_buffer, terminal_info.tmp_buffer_index); //flush to the b-tree
     terminal_info.tmp_buffer_screen_index = -1;
     terminal_info.tmp_buffer_index = 0;
+}
+
+int get_utf8_char_length(uint8_t ch) 
+{
+    if ((ch & 0x80) == 0x00) 
+    {      
+        return 1;                   
+    } 
+    else if ((ch & 0xE0) == 0xC0) 
+    { 
+        return 2;                   
+    } 
+    else if ((ch & 0xF0) == 0xE0) 
+    { 
+        return 3;                   
+    } 
+    else if ((ch & 0xF8) == 0xF0) 
+    {
+        return 4;                 
+    }
+    
+    return 1; 
 }
