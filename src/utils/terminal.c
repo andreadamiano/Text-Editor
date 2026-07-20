@@ -385,6 +385,7 @@ void add_to_delete_buffer(uint8_t index)
         }
     }
 
+    //if the deleted character is inside the temporary buffer
     if (terminal_info.tmp_buffer_index && (index - 1 >= terminal_info.tmp_buffer_screen_index && index - 1 <= terminal_info.tmp_buffer_screen_index + terminal_info.tmp_buffer_index))
     {   
         int remove_len = MIN(char_len, terminal_info.tmp_buffer_index);
@@ -395,6 +396,7 @@ void add_to_delete_buffer(uint8_t index)
         index -= remove_len;
     }
     
+    //if the deleted character is inside a node of the b-tree
     if (char_len)
     {
         delete_string(index, char_len);
