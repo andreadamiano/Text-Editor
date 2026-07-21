@@ -78,10 +78,9 @@ void render_file_content()
     terminal_info.displayed_content = request_block(terminal_info.scratch_arena, (terminal_info.terminal_size.ws_col * terminal_info.terminal_size.ws_row) * 4); //ensure UTF-8 safety
     
     //the extra slot acts as a safe boundary check to prevent out-of-bounds bugs
-    terminal_info.displayed_cols = request_block(terminal_info.scratch_arena, terminal_info.terminal_size.ws_row+1); 
+    terminal_info.displayed_cols = request_block(terminal_info.scratch_arena, terminal_info.terminal_size.ws_row+2); 
 
-    //clear the screen, clear the scrollback history and move cursor to the top left position
-    // printf("\e[2J\e[3J\e[H");
+    //clear the screen and move cursor to the top left position
     printf("\e[2J\e[H");
 
     int32_t node_index = file_info.curr_index;
@@ -93,50 +92,59 @@ void render_file_content()
 
     for (int row = 0; row < terminal_info.terminal_size.ws_row; ++row)
     {   
-
-        for(int offset = 0; offset < terminal_info.row_offset; ++offset)
-        {
-            if ((ch = consume_char_from_node(&current_node, &node_index)) == '\0')
-                goto end;
-
-            terminal_info.displayed_content[content_index++] = ch;
-            
-            if (ch == '\n')
-            {
-                putchar('\n');
-                goto end_loop;
-            }
-        }
-
-        int col = 0;        
+        int col = 0;      
         while (col < terminal_info.terminal_size.ws_col)
         {
+            //skip not visible part of the current row
+            while (col < terminal_info.row_offset)
+            {
+                ch = consume_char_from_node(&current_node, &node_index);
+                terminal_info.displayed_content[content_index++] = ch;
+                ++col;
+
+                if (ch == '\0')
+                    goto end;
+                
+                if (ch == '\n')
+                {
+                    putchar('\n');
+                    break;
+                }
+            }
+
             //display tmp buffer
-            if (content_index == terminal_info.tmp_buffer_screen_index)
+            if (content_index >= terminal_info.tmp_buffer_screen_index && content_index < terminal_info.tmp_buffer_screen_index + terminal_info.tmp_buffer_index)
             {
                 for (int i = 0; i < terminal_info.tmp_buffer_index; ++i)
                 {
-                    putchar(terminal_info.tmp_buffer[i]);
+                    ch = terminal_info.tmp_buffer[i];
+                    putchar(ch);
                     terminal_info.displayed_content[content_index++] = terminal_info.tmp_buffer[i];
 
-                    if ((terminal_info.tmp_buffer[i] & 0xC0) != 0x80) 
+                    if (ch == '\n')
+                    {
+                        break;
+                    }
+
+                    if ((ch & 0xC0) != 0x80) 
                     {
                         col++;
                     }
                 }
             }
 
-            if ((ch = consume_char_from_node(&current_node, &node_index)) == '\0')
-                goto end;
-
-            if (ch == '\n')
-            {
-                terminal_info.displayed_content[content_index++] = ch;
-                break;
-            }
-            
+            //display leaf nodes of the b-tree
+            ch = consume_char_from_node(&current_node, &node_index);
             putchar(ch);
             terminal_info.displayed_content[content_index++] = ch;
+
+            if (ch == '\0')
+                goto end;
+            
+            if (ch == '\n')
+            {
+                break;
+            }
 
             //if it is a UTF-8 continuation byte, do not increment the column counter
             if ((ch & 0xC0) != 0x80) 
@@ -144,8 +152,6 @@ void render_file_content()
                 col++;
             } 
         }
-
-        putchar('\n');
 
         //if the current line was broken before reaching the \n was reached (becasue its bigger than the current horizontal size of the terminal) loop untill the next \n
         while (ch != '\n')
@@ -156,15 +162,13 @@ void render_file_content()
             terminal_info.displayed_content[content_index++] = ch;
         }
 
-        end_loop:
-        terminal_info.displayed_cols[current_row] = content_index-1;
+        terminal_info.displayed_cols[current_row] = content_index;
         current_row += 1;
     }
 
     end:
-    terminal_info.displayed_content[content_index++] = '\n';
     terminal_info.displayed_cols[current_row] = content_index;
-    terminal_info.content_size = content_index-1;
+    terminal_info.content_size = content_index;
 
     //reset the cursor to the current position in the terminal
     printf("\e[%d;%dH", terminal_info.cursor_row + 1, terminal_info.cursor_col + 1);
@@ -186,7 +190,8 @@ void read_input()
 
     switch (ch)
     {
-        case 'q':
+        //cntrl+q
+        case 17:
             running = false;
             break;
 
@@ -204,7 +209,7 @@ void read_input()
                         if (terminal_info.content_index <= 0)
                             break;
 
-                        uint8_t prev_line_size = terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.displayed_cols[terminal_info.cursor_row-2];
+                        uint8_t prev_line_size = terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.displayed_cols[terminal_info.cursor_row-2] - 1;
                         int char_len = 0;
                         char current_char;
                         
@@ -224,7 +229,6 @@ void read_input()
                             terminal_info.cursor_row = MAX(terminal_info.cursor_row - 1, 0);
                             terminal_info.cursor_col = MIN(prev_line_size, terminal_info.terminal_size.ws_col);
                             terminal_info.row_offset = MAX(prev_line_size - terminal_info.terminal_size.ws_col,0);
-                            terminal_info.content_index = MAX(terminal_info.content_index - 1, 0);
                             break;
                         }
 
@@ -243,10 +247,10 @@ void read_input()
                     }
                     //right arrow
                     case 67:
-                        if (terminal_info.content_index >= terminal_info.content_size)
+                        if (terminal_info.content_index >= terminal_info.content_size - 1)
                             break;
 
-                        uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1];
+                        uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1] - 1;
                         char current_char = terminal_info.displayed_content[terminal_info.content_index];
                         int char_len = get_utf8_char_length(current_char);
 
@@ -281,12 +285,12 @@ void read_input()
                         }
                         else
                         {
-                            uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1];
-                            uint8_t prev_line_size = terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.displayed_cols[terminal_info.cursor_row-2];
+                            uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1] - 1;
+                            uint8_t prev_line_size = terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.displayed_cols[terminal_info.cursor_row-2] - 1;
 
                             terminal_info.cursor_row = MAX(terminal_info.cursor_row - 1, 0);
                             terminal_info.cursor_col = MIN(terminal_info.cursor_col, prev_line_size);
-                            terminal_info.content_index = terminal_info.displayed_cols[terminal_info.cursor_row];
+                            terminal_info.content_index = terminal_info.displayed_cols[terminal_info.cursor_row]-1;
                             terminal_info.row_offset = MAX(prev_line_size - terminal_info.terminal_size.ws_col ,0);
                         } 
                         break;
@@ -303,10 +307,10 @@ void read_input()
             
                             if (terminal_info.displayed_cols[terminal_info.cursor_row + 1] != 0)
                             {
-                                uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1];
-                                uint8_t next_line_size = terminal_info.displayed_cols[terminal_info.cursor_row+1] - terminal_info.displayed_cols[terminal_info.cursor_row];
+                                uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1] - 1;
+                                uint8_t next_line_size = terminal_info.displayed_cols[terminal_info.cursor_row+1] - terminal_info.displayed_cols[terminal_info.cursor_row] - 1;
 
-                                terminal_info.cursor_row += 1;
+                                terminal_info.cursor_row = MIN(terminal_info.cursor_row + 1, terminal_info.terminal_size.ws_row);
                                 terminal_info.cursor_col = MIN(terminal_info.cursor_col, next_line_size);
                                 terminal_info.content_index += MIN(line_size + 1, line_size - terminal_info.content_index + terminal_info.cursor_col + 1);
                                 terminal_info.row_offset = MAX(terminal_info.content_index - terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.terminal_size.ws_col ,0);
@@ -365,8 +369,17 @@ int8_t write_to_tmp_buffer(uint8_t index, uint8_t ch)
     
     if ((ch & 0xC0) != 0x80) 
     {
-        terminal_info.cursor_col = MIN(terminal_info.cursor_col + 1, terminal_info.terminal_size.ws_col);
-        terminal_info.row_offset = MAX(line_size + 1 - terminal_info.terminal_size.ws_col, 0);
+        if (ch != '\n')
+        {
+            terminal_info.cursor_col = MIN(terminal_info.cursor_col + 1, terminal_info.terminal_size.ws_col);
+            terminal_info.row_offset = MAX(line_size + 1 - terminal_info.terminal_size.ws_col, 0);
+        }
+        else
+        {
+            terminal_info.row_offset = MAX(line_size + 1 - terminal_info.terminal_size.ws_col - terminal_info.cursor_col, 0);
+            terminal_info.cursor_col = 0;
+            terminal_info.cursor_row = MIN(terminal_info.cursor_row + 1, terminal_info.terminal_size.ws_row);
+        }
     }
 }
 
@@ -403,8 +416,8 @@ void add_to_delete_buffer(uint8_t index)
     }
     
     uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1] - char_len;
+    uint8_t prev_line_size = terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.displayed_cols[terminal_info.cursor_row-2] - char_len;
     terminal_info.cursor_col = MAX(terminal_info.cursor_col - 1, 0);
-    // terminal_info.content_index = MAX(terminal_info.content_index -1, 0); 
     terminal_info.row_offset = MAX(line_size + 1 - terminal_info.terminal_size.ws_col, 0);
 
     if (!terminal_info.tmp_buffer_index)
