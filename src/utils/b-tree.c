@@ -320,8 +320,12 @@ void delete_string_from_node(LeafNode_t* node, uint32_t end_index, uint32_t dele
 
         node = node->prev;
         delete_size -= deleted_size;
-        end_index = node->base.content_size - 1;
         deleted_size = 0;
+
+        if (node)
+        {
+            end_index = node->base.content_size - 1;
+        }
     }
 
 }
