@@ -201,18 +201,20 @@ void read_input()
 
             if (ch1 == '[')
             {
+                uint8_t line_size = MAX(terminal_info.displayed_cols[terminal_info.cursor_row] - 1, 0) - terminal_info.displayed_cols[terminal_info.cursor_row-1];
+                uint8_t next_line_size = MAX(terminal_info.displayed_cols[terminal_info.cursor_row+1] -1, 0) - terminal_info.displayed_cols[terminal_info.cursor_row];
+                uint8_t prev_line_size = MAX(terminal_info.displayed_cols[terminal_info.cursor_row-1] - 1, 0) - terminal_info.displayed_cols[terminal_info.cursor_row-2];
+                int char_len = 0;
+                char current_char;
+
                 switch (ch2) 
                 {   
+
                     //left arrow
                     case 68: 
-                    {
                         if (terminal_info.content_index <= 0)
                             break;
 
-                        uint8_t prev_line_size = terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.displayed_cols[terminal_info.cursor_row-2] - 1;
-                        int char_len = 0;
-                        char current_char;
-                        
                         while (terminal_info.content_index > 0)
                         {
                             current_char = terminal_info.displayed_content[--terminal_info.content_index];
@@ -232,8 +234,6 @@ void read_input()
                             break;
                         }
 
-                        // terminal_info.content_index = MAX(terminal_info.content_index - 1, 0);
-
                         if (terminal_info.cursor_col <= 0) 
                         {
                             terminal_info.row_offset = MAX(terminal_info.row_offset - 1, 0);
@@ -244,15 +244,14 @@ void read_input()
                         } 
                     
                         break;
-                    }
+                    
                     //right arrow
                     case 67:
                         if (terminal_info.content_index >= terminal_info.content_size - 1)
                             break;
 
-                        uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1] - 1;
-                        char current_char = terminal_info.displayed_content[terminal_info.content_index];
-                        int char_len = get_utf8_char_length(current_char);
+                        current_char = terminal_info.displayed_content[terminal_info.content_index];
+                        char_len = get_utf8_char_length(current_char);
 
                         if (current_char == '\n' )
                         {
@@ -285,12 +284,9 @@ void read_input()
                         }
                         else
                         {
-                            uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1] - 1;
-                            uint8_t prev_line_size = terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.displayed_cols[terminal_info.cursor_row-2] - 1;
-
+                            terminal_info.content_index -= MAX(prev_line_size + 1, terminal_info.cursor_col + 1);
                             terminal_info.cursor_row = MAX(terminal_info.cursor_row - 1, 0);
                             terminal_info.cursor_col = MIN(terminal_info.cursor_col, prev_line_size);
-                            terminal_info.content_index = terminal_info.displayed_cols[terminal_info.cursor_row]-1;
                             terminal_info.row_offset = MAX(prev_line_size - terminal_info.terminal_size.ws_col ,0);
                         } 
                         break;
@@ -307,12 +303,9 @@ void read_input()
             
                             if (terminal_info.displayed_cols[terminal_info.cursor_row + 1] != 0)
                             {
-                                uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1] - 1;
-                                uint8_t next_line_size = terminal_info.displayed_cols[terminal_info.cursor_row+1] - terminal_info.displayed_cols[terminal_info.cursor_row] - 1;
-
+                                terminal_info.content_index += MIN(line_size + 1, line_size + 1 - terminal_info.cursor_col + next_line_size);
                                 terminal_info.cursor_row = MIN(terminal_info.cursor_row + 1, terminal_info.terminal_size.ws_row);
                                 terminal_info.cursor_col = MIN(terminal_info.cursor_col, next_line_size);
-                                terminal_info.content_index += MIN(line_size + 1, line_size - terminal_info.content_index + terminal_info.cursor_col + 1);
                                 terminal_info.row_offset = MAX(terminal_info.content_index - terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.terminal_size.ws_col ,0);
                             }
                         } 
@@ -415,8 +408,8 @@ void add_to_delete_buffer(uint8_t index)
         delete_string(index, char_len);
     }
     
-    uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1] - char_len;
-    uint8_t prev_line_size = terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.displayed_cols[terminal_info.cursor_row-2] - char_len;
+    uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1] - 1 - char_len;
+    uint8_t prev_line_size = terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.displayed_cols[terminal_info.cursor_row-2] - 1 - char_len;
     terminal_info.cursor_col = MAX(terminal_info.cursor_col - 1, 0);
     terminal_info.row_offset = MAX(line_size + 1 - terminal_info.terminal_size.ws_col, 0);
 
