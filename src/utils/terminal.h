@@ -23,6 +23,9 @@ typedef struct
     uint8_t tmp_buffer[MAX_FILE_READ_CHUNK];
     int16_t tmp_buffer_screen_index;
     int16_t tmp_buffer_index;
+    int16_t line_size;
+    int16_t next_line_size;
+    int16_t prev_line_size;
     
 }terminal_info_t;
 

@@ -24,16 +24,16 @@ bool insert_string(uint32_t index, uint8_t* content, uint32_t content_size)
     insert_string_into_node((LeafNode_t*) node, index, content, content_size);
 }
 
-bool delete_string(uint32_t start_index, uint32_t lenght)
+bool delete_string(uint32_t end_index, uint32_t lenght)
 {
-    Node_t* node = find_node_at_index(&start_index, false);
+    Node_t* node = find_node_at_index(&end_index, false);
     
-    if (!node || !start_index)
+    if (!node || !end_index)
     {
         return false;
     } 
 
-    delete_string_from_node((LeafNode_t*) node, start_index-1, lenght);
+    delete_string_from_node((LeafNode_t*) node, end_index-lenght, lenght);
     return true;
 }
 

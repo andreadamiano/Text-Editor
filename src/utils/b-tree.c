@@ -312,12 +312,12 @@ void delete_string_from_node(LeafNode_t* node, uint32_t end_index, uint32_t dele
     while ((delete_size - deleted_size) && node)
     {
         deleted_size = MIN(delete_size, node->base.content_size);
-        node->base.content_size = MAX((int32_t) node->base.content_size - deleted_size, 0);
 
         //shift content to replace the deleted content
         memmove(node->content + MAX((int32_t)(end_index - deleted_size + 1), 0), node->content + MIN(end_index + 1, node->base.content_size - 1), MAX((int32_t)(node->base.content_size - end_index - 1), 0));
         update_size_from_node((Node_t*) node, -deleted_size);
 
+        node->base.content_size = MAX((int32_t) node->base.content_size - deleted_size, 0);
         node = node->prev;
         delete_size -= deleted_size;
         deleted_size = 0;
