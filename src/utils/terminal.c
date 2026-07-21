@@ -108,7 +108,7 @@ void render_file_content()
                 if (ch == '\n')
                 {
                     putchar('\n');
-                    break;
+                    goto end_loop;
                 }
             }
 
@@ -123,7 +123,7 @@ void render_file_content()
 
                     if (ch == '\n')
                     {
-                        break;
+                        goto end_loop;
                     }
 
                     if ((ch & 0xC0) != 0x80) 
@@ -152,7 +152,8 @@ void render_file_content()
                 col++;
             } 
         }
-
+        
+        end_loop:
         //if the current line was broken before reaching the \n was reached (becasue its bigger than the current horizontal size of the terminal) loop untill the next \n
         while (ch != '\n')
         {
@@ -410,6 +411,12 @@ void add_to_delete_buffer(uint8_t index)
     
     uint8_t line_size = terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.displayed_cols[terminal_info.cursor_row-1] - 1 - char_len;
     uint8_t prev_line_size = terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.displayed_cols[terminal_info.cursor_row-2] - 1 - char_len;
+
+    if (terminal_info.cursor_col == 0)
+    {
+        terminal_info.cursor_row = MAX(0, terminal_info.cursor_row-1);
+    }
+
     terminal_info.cursor_col = MAX(terminal_info.cursor_col - 1, 0);
     terminal_info.row_offset = MAX(line_size + 1 - terminal_info.terminal_size.ws_col, 0);
 
