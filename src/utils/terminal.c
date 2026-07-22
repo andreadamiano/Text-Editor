@@ -356,7 +356,7 @@ int8_t write_to_tmp_buffer(uint32_t index, uint8_t ch)
     else
     {
         //if the user insert in a new index, which is not where the current tmp buffer point or the tmp buffer is full flush it
-        if (index > terminal_info.tmp_buffer_index + terminal_info.tmp_buffer_screen_index || terminal_info.tmp_buffer_index + 1 > MAX_FILE_READ_CHUNK)
+        if (index > terminal_info.tmp_buffer_index + terminal_info.tmp_buffer_screen_index || index < terminal_info.tmp_buffer_screen_index || terminal_info.tmp_buffer_index + 1 > MAX_FILE_READ_CHUNK)
         {
             insert_string(terminal_info.tmp_buffer_screen_index + file_info.curr_index, terminal_info.tmp_buffer, terminal_info.tmp_buffer_index);
             terminal_info.tmp_buffer_screen_index = index;
