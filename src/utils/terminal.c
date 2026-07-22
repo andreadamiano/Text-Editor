@@ -87,8 +87,8 @@ void render_file_content()
     LeafNode_t* current_node = (LeafNode_t*) find_node_at_index(&node_index, false);
 
     char ch;
-    uint8_t content_index = 0;
-    uint8_t current_row = 0;
+    uint32_t content_index = 0;
+    uint32_t current_row = 0;
     int tmp_index = 0;
 
     for (int row = 0; row < terminal_info.terminal_size.ws_row; ++row)
@@ -122,7 +122,7 @@ void render_file_content()
                     ch = terminal_info.tmp_buffer[tmp_index++];
 
                     //if the end of the terminal window is reached consume (without displaying) all the remaining tmp buffer
-                    if (col < terminal_info.terminal_size.ws_col)
+                    if (col < terminal_info.terminal_size.ws_col || ch == '\n')
                     {
                         putchar(ch);
                         fflush(stdout);
@@ -167,7 +167,13 @@ void render_file_content()
         //if the current line was broken before reaching the \n was reached (becasue its bigger than the current horizontal size of the terminal) loop untill the next \n
         while (ch != '\n')
         {
-            if ((ch = consume_char_from_node(&current_node, &node_index)) == '\0')
+            //consume the non visibile line either from the tmp buffer of the b-tree
+            if (content_index >= terminal_info.tmp_buffer_screen_index && content_index < terminal_info.tmp_buffer_screen_index + terminal_info.tmp_buffer_index)
+            {
+                ch = terminal_info.tmp_buffer[tmp_index++];
+            }
+
+            else if ((ch = consume_char_from_node(&current_node, &node_index)) == '\0')
                 goto end;
             
             terminal_info.displayed_content[content_index++] = ch;
@@ -305,7 +311,7 @@ void read_input()
             
                             if (terminal_info.displayed_cols[terminal_info.cursor_row + 1] != 0)
                             {
-                                terminal_info.content_index += MIN(terminal_info.line_size + 1, terminal_info.line_size + 1 - terminal_info.content_index + terminal_info.next_line_size);
+                                terminal_info.content_index += MIN(terminal_info.line_size + 1, terminal_info.displayed_cols[terminal_info.cursor_row] + 1 - terminal_info.content_index + terminal_info.next_line_size);
                                 terminal_info.cursor_row = MIN(terminal_info.cursor_row + 1, terminal_info.terminal_size.ws_row);
                                 terminal_info.cursor_col = MIN(terminal_info.cursor_col, terminal_info.next_line_size);
                                 terminal_info.row_offset = MAX(terminal_info.content_index - terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.terminal_size.ws_col ,0);
@@ -364,16 +370,18 @@ int8_t write_to_tmp_buffer(uint8_t index, uint8_t ch)
     }
     terminal_info.content_index += 1;
     
+    //if the inserted char is not a continuation UTF-8 byte move the terminal cursor
     if ((ch & 0xC0) != 0x80) 
     {
         if (ch != '\n')
         {
-            terminal_info.cursor_col = MIN(terminal_info.cursor_col + 1, terminal_info.terminal_size.ws_col-1);
-
-            if (terminal_info.content_index == terminal_info.line_size + 1)
+            //check if the cursor is at the end of the terminal window
+            if (terminal_info.cursor_col + 1 >= terminal_info.terminal_size.ws_col)
             {
                 terminal_info.row_offset = MAX(terminal_info.line_size + 2 - terminal_info.terminal_size.ws_col, 0);    
             }
+
+            terminal_info.cursor_col = MIN(terminal_info.cursor_col + 1, terminal_info.terminal_size.ws_col-1);
         }
         else
         {

@@ -16,16 +16,16 @@ typedef struct
     uint8_t content_index;
     uint8_t content_size;
     uint8_t* displayed_content;
-    uint8_t* displayed_cols;
+    int32_t* displayed_cols;
     uint8_t row_offset;
     volatile sig_atomic_t screen_resized; //sig_atomic_t ensure that the varible is an integer type of a size that cna be accessed by the CPU in a single instruction
     Arena_t* scratch_arena;
     uint8_t tmp_buffer[MAX_FILE_READ_CHUNK];
     int16_t tmp_buffer_screen_index;
     int16_t tmp_buffer_index;
-    int16_t line_size;
-    int16_t next_line_size;
-    int16_t prev_line_size;
+    int32_t line_size;
+    int32_t next_line_size;
+    int32_t prev_line_size;
     
 }terminal_info_t;
 
