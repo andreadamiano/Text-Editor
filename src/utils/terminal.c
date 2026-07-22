@@ -372,6 +372,7 @@ int8_t write_to_tmp_buffer(uint32_t index, uint8_t ch)
             ++terminal_info.tmp_buffer_index;
         }
     }
+
     terminal_info.content_index += 1;
     
     //if the inserted char is not a continuation UTF-8 byte move the terminal cursor
@@ -423,11 +424,24 @@ void add_to_delete_buffer(uint32_t index)
         char_len -= remove_len;
         index -= remove_len;
     }
-    
-    //if the deleted character is inside a node of the b-tree
-    if (char_len)
+    else
     {
-        delete_string(index, char_len);
+        //if the user delete a new index, which is not where the current delete buffer point or the delete buffer is full flush it
+        if (index > terminal_info.delete_buffer_screen_end_index || terminal_info.tmp_buffer_index + 1 > MAX_FILE_READ_CHUNK)
+        {
+            delete_string(terminal_info.delete_buffer_screen_end_index + file_info.curr_index, terminal_info.delete_buffer_len); 
+            terminal_info.tmp_buffer_screen_index = index;
+            terminal_info.tmp_buffer_index = 0;
+            terminal_info.tmp_buffer[terminal_info.tmp_buffer_index++] = ch;
+        }
+        //append to the tmp buffer
+        else
+        {
+            uint8_t tmp_buffer_index = index - terminal_info.tmp_buffer_screen_index;
+            memmove(terminal_info.tmp_buffer + tmp_buffer_index + 1, terminal_info.tmp_buffer + tmp_buffer_index, MIN(MAX_FILE_READ_CHUNK - 1 - tmp_buffer_index, terminal_info.tmp_buffer_index - tmp_buffer_index));
+            terminal_info.tmp_buffer[tmp_buffer_index] = ch;
+            ++terminal_info.tmp_buffer_index;
+        }
     }
 
     if (current_char == '\n')
@@ -442,6 +456,7 @@ void add_to_delete_buffer(uint32_t index)
 
     terminal_info.row_offset = MAX(terminal_info.row_offset - 1, 0);
 
+    //if the tmp buffer was completely emptied signal it (by putting the index to a default -1)
     if (!terminal_info.tmp_buffer_index)
     {
         terminal_info.tmp_buffer_screen_index  = -1;

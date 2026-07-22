@@ -9,20 +9,31 @@
 
 typedef struct 
 {
+    //terminal cursor
     struct termios orig_termios;
     struct winsize terminal_size;
     uint8_t cursor_row;
     uint8_t cursor_col; 
+
+    //content informations
     int32_t content_index;
     uint32_t content_size;
     uint8_t* displayed_content;
     int32_t* displayed_cols;
     int32_t row_offset;
     volatile sig_atomic_t screen_resized; //sig_atomic_t ensure that the varible is an integer type of a size that cna be accessed by the CPU in a single instruction
+
+    //temporary arena, to store temporary informations overwritten every rendering cycle
     Arena_t* scratch_arena;
+
+    //write and delete buffers
     uint8_t tmp_buffer[MAX_FILE_READ_CHUNK];
     int16_t tmp_buffer_screen_index;
     int16_t tmp_buffer_index;
+    int16_t delete_buffer_screen_end_index;
+    int16_t delete_buffer_len;
+
+    //terminal lines
     int32_t line_size;
     int32_t next_line_size;
     int32_t prev_line_size;
