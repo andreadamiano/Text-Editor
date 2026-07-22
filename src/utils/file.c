@@ -33,7 +33,7 @@ bool delete_string(uint32_t end_index, uint32_t lenght)
         return false;
     } 
 
-    delete_string_from_node((LeafNode_t*) node, end_index-lenght, lenght);
+    delete_string_from_node((LeafNode_t*) node, end_index-1, lenght);
     return true;
 }
 

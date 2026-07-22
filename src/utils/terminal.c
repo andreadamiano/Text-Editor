@@ -46,6 +46,7 @@ void put_terminal_raw()
     terminal_info.content_index = 0;
     terminal_info.tmp_buffer_index = 0;
     terminal_info.tmp_buffer_screen_index = -1;
+    terminal_info.delete_buffer_screen_end_index = -1;
 
     //intialize arena
     terminal_info.scratch_arena = init_arena(KiB(24));
@@ -76,6 +77,7 @@ void render_file_content()
         return;
     }
 
+    //initialize scratch arena
     arena_reset(terminal_info.scratch_arena);
     terminal_info.displayed_content = request_block(terminal_info.scratch_arena, (terminal_info.terminal_size.ws_col * terminal_info.terminal_size.ws_row) * 4); //ensure UTF-8 safety
     
@@ -85,51 +87,59 @@ void render_file_content()
     //clear the screen and move cursor to the top left position
     printf("\e[2J\e[H");
 
+    //get the starting node from which to start printing the content on the terminal
     int32_t node_index = file_info.curr_index;
     LeafNode_t* current_node = (LeafNode_t*) find_node_at_index(&node_index, false);
 
     char ch;
-    uint32_t content_index = 0;
+    int32_t content_index = 0;
+    int32_t displayed_content_index = 0;
     uint32_t current_row = 0;
     int tmp_index = 0;
+    bool skip = false;
+    int current_col = 0;
+    int skip_col = 0;
 
-    for (int row = 0; row < terminal_info.terminal_size.ws_row; ++row)
+    while (current_row < terminal_info.terminal_size.ws_row)
     {   
-        int col = 0;      
-        int skip_col = 0;
-        while (col < terminal_info.terminal_size.ws_col)
+        current_col = 0;      
+        skip_col = 0;
+        skip = false;
+        while (current_col < terminal_info.terminal_size.ws_col)
         {
             //skip not visible part of the current row
             while (skip_col < terminal_info.row_offset)
             {
                 ++skip_col;
                 ch = consume_char_from_node(&current_node, &node_index);
-                terminal_info.displayed_content[content_index++] = ch;
+                terminal_info.displayed_content[displayed_content_index++] = ch;
 
                 if (ch == '\0')
                     goto end;
                 
-                if (ch == '\n')
+                if (ch == '\n' && !is_deleted(content_index))
                 {
                     putchar('\n');
                     goto end_loop;
                 }
+                ++content_index;
             }
 
             //display tmp buffer
-            if (content_index >= terminal_info.tmp_buffer_screen_index && content_index < terminal_info.tmp_buffer_screen_index + terminal_info.tmp_buffer_index)
+            if (terminal_info.tmp_buffer_screen_index != -1 && content_index >= terminal_info.tmp_buffer_screen_index && content_index < terminal_info.tmp_buffer_screen_index + terminal_info.tmp_buffer_index)
             {
                 while(tmp_index < terminal_info.tmp_buffer_index)
                 {
                     ch = terminal_info.tmp_buffer[tmp_index++];
 
                     //if the end of the terminal window is reached consume (without displaying) all the remaining tmp buffer
-                    if (col < terminal_info.terminal_size.ws_col || ch == '\n')
+                    if (current_col < terminal_info.terminal_size.ws_col || ch == '\n')
                     {
                         putchar(ch);
+                        fflush(stdout);
                     }
 
-                    terminal_info.displayed_content[content_index++] = ch;
+                    terminal_info.displayed_content[displayed_content_index++] = ch;
 
                     if (ch == '\n')
                     {
@@ -138,29 +148,35 @@ void render_file_content()
 
                     if ((ch & 0xC0) != 0x80) 
                     {
-                        col++;
+                        current_col++;
                     }
+
+                    ++content_index;
                 }
             }
 
-            //display leaf nodes of the b-tree
+            //display character of the nodes of the b-tree
             ch = consume_char_from_node(&current_node, &node_index);
-            putchar(ch);
-            terminal_info.displayed_content[content_index++] = ch;
 
-            if (ch == '\0')
-                goto end;
-            
-            if (ch == '\n')
+            if (!is_deleted(content_index))
             {
-                break;
+                putchar(ch);
+                fflush(stdout);
+                skip = false;
+                terminal_info.displayed_content[displayed_content_index++] = ch;
+                if ((ch & 0xC0) != 0x80) current_col++; //if it is a UTF-8 continuation byte, do not increment the column counter
+            }
+            else
+            {
+                skip = true;
             }
 
-            //if it is a UTF-8 continuation byte, do not increment the column counter
-            if ((ch & 0xC0) != 0x80) 
-            {
-                col++;
-            } 
+            ++content_index;
+
+            if (ch == '\0' && !skip) goto end;
+            
+            if (ch == '\n' && !skip) break;
+
         }
         
         end_loop:
@@ -176,20 +192,24 @@ void render_file_content()
             else if ((ch = consume_char_from_node(&current_node, &node_index)) == '\0')
                 goto end;
             
-            terminal_info.displayed_content[content_index++] = ch;
+            
+            if (!is_deleted(content_index))
+            {
+                terminal_info.displayed_content[displayed_content_index++] = ch;
+                if (ch == '\n')
+                    putchar(ch);
+            }
 
-            //always render the newline even if its out of screen
-            if (ch == '\n')
-                putchar(ch);
+                ++content_index;
         }
 
-        terminal_info.displayed_cols[current_row] = content_index;
+        terminal_info.displayed_cols[current_row] = displayed_content_index;
         current_row += 1;
     }
 
     end:
-    terminal_info.displayed_cols[current_row] = content_index;
-    terminal_info.content_size = content_index;
+    terminal_info.displayed_cols[current_row] = displayed_content_index;
+    terminal_info.content_size = displayed_content_index;
 
     //reset the cursor to the current position in the terminal
     printf("\e[%d;%dH", terminal_info.cursor_row + 1, terminal_info.cursor_col + 1);
@@ -299,7 +319,7 @@ void read_input()
                             terminal_info.content_index -= MAX(terminal_info.prev_line_size + 1, terminal_info.cursor_col + 1);
                             terminal_info.cursor_row = MAX(terminal_info.cursor_row - 1, 0);
                             terminal_info.cursor_col = MIN(terminal_info.cursor_col, terminal_info.prev_line_size);
-                            terminal_info.row_offset = MAX(terminal_info.prev_line_size - terminal_info.terminal_size.ws_col ,0);
+                            terminal_info.row_offset = MAX(terminal_info.content_index - terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.terminal_size.ws_col,0);
                         } 
                         break;
                         
@@ -315,7 +335,7 @@ void read_input()
             
                             if (terminal_info.displayed_cols[terminal_info.cursor_row + 1] != 0)
                             {
-                                terminal_info.content_index += MIN(terminal_info.line_size + 1, terminal_info.displayed_cols[terminal_info.cursor_row] + 1 - terminal_info.content_index + terminal_info.next_line_size);
+                                terminal_info.content_index += MIN(terminal_info.line_size + 1, terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.content_index + terminal_info.next_line_size);
                                 terminal_info.cursor_row = MIN(terminal_info.cursor_row + 1, terminal_info.terminal_size.ws_row);
                                 terminal_info.cursor_col = MIN(terminal_info.cursor_col, terminal_info.next_line_size);
                                 terminal_info.row_offset = MAX(terminal_info.content_index - terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.terminal_size.ws_col ,0);
@@ -346,6 +366,11 @@ void read_input()
 
 int8_t write_to_tmp_buffer(uint32_t index, uint8_t ch)
 {
+    if (terminal_info.delete_buffer_screen_end_index != -1 )
+    {
+        flush_delete_buffer();
+    }
+
     //if the tmp buffer is empty add to it
     if (terminal_info.tmp_buffer_screen_index == -1)
     {
@@ -426,40 +451,46 @@ void add_to_delete_buffer(uint32_t index)
     }
     else
     {
-        //if the user delete a new index, which is not where the current delete buffer point or the delete buffer is full flush it
-        if (index > terminal_info.delete_buffer_screen_end_index || terminal_info.tmp_buffer_index + 1 > MAX_FILE_READ_CHUNK)
+        if (terminal_info.delete_buffer_screen_end_index == -1)
         {
-            delete_string(terminal_info.delete_buffer_screen_end_index + file_info.curr_index, terminal_info.delete_buffer_len); 
-            terminal_info.tmp_buffer_screen_index = index;
-            terminal_info.tmp_buffer_index = 0;
-            terminal_info.tmp_buffer[terminal_info.tmp_buffer_index++] = ch;
+            terminal_info.delete_buffer_screen_end_index = index;
+            terminal_info.delete_buffer_len = 1;
         }
-        //append to the tmp buffer
         else
-        {
-            uint8_t tmp_buffer_index = index - terminal_info.tmp_buffer_screen_index;
-            memmove(terminal_info.tmp_buffer + tmp_buffer_index + 1, terminal_info.tmp_buffer + tmp_buffer_index, MIN(MAX_FILE_READ_CHUNK - 1 - tmp_buffer_index, terminal_info.tmp_buffer_index - tmp_buffer_index));
-            terminal_info.tmp_buffer[tmp_buffer_index] = ch;
-            ++terminal_info.tmp_buffer_index;
+        {        
+            //if the user delete a new index, which is not where the current delete buffer point or the delete buffer is full flush it
+            if (index < terminal_info.delete_buffer_screen_end_index - terminal_info.delete_buffer_len || index >= terminal_info.delete_buffer_screen_end_index || terminal_info.delete_buffer_len + 1 > MAX_FILE_READ_CHUNK)
+            {
+                delete_string(terminal_info.delete_buffer_screen_end_index + file_info.curr_index, terminal_info.delete_buffer_len); 
+                terminal_info.delete_buffer_screen_end_index = index;
+                terminal_info.delete_buffer_len = 1;
+            }
+            //append to the delete buffer
+            else
+            {
+                ++terminal_info.delete_buffer_len;
+            }
         }
     }
 
+    //move cursor
     if (current_char == '\n')
     {
-        terminal_info.cursor_col = terminal_info.prev_line_size;
-        terminal_info.cursor_row = MAX(0, terminal_info.cursor_row-1);
+        terminal_info.cursor_row = MAX(terminal_info.cursor_row - 1, 0);
+        terminal_info.cursor_col = MIN(terminal_info.prev_line_size, terminal_info.terminal_size.ws_col-1);
+        terminal_info.row_offset = MAX(terminal_info.prev_line_size - terminal_info.terminal_size.ws_col+1,0);
     }
     else
     {
         terminal_info.cursor_col = MAX(MIN(terminal_info.cursor_col + terminal_info.row_offset - 1, terminal_info.terminal_size.ws_col-1), 0);
+        terminal_info.row_offset = MAX(terminal_info.row_offset - 1, 0);
     }
 
-    terminal_info.row_offset = MAX(terminal_info.row_offset - 1, 0);
-
     //if the tmp buffer was completely emptied signal it (by putting the index to a default -1)
-    if (!terminal_info.tmp_buffer_index)
+    if (!terminal_info.delete_buffer_len && terminal_info.delete_buffer_screen_end_index != -1)
     {
-        terminal_info.tmp_buffer_screen_index  = -1;
+        terminal_info.delete_buffer_screen_end_index  = -1;
+        terminal_info.delete_buffer_len = 0;
     }
 }
 
@@ -468,6 +499,16 @@ void flush_tmp_buffer()
     insert_string(terminal_info.tmp_buffer_screen_index + file_info.curr_index, terminal_info.tmp_buffer, terminal_info.tmp_buffer_index); //flush to the b-tree
     terminal_info.tmp_buffer_screen_index = -1;
     terminal_info.tmp_buffer_index = 0;
+}
+
+void flush_delete_buffer()
+{
+    if (terminal_info.delete_buffer_len)
+    {
+        delete_string(terminal_info.delete_buffer_screen_end_index + file_info.curr_index, terminal_info.delete_buffer_len); 
+        terminal_info.delete_buffer_screen_end_index = -1;
+        terminal_info.delete_buffer_len = 0;
+    }
 }
 
 int get_utf8_char_length(uint8_t ch) 
@@ -490,4 +531,9 @@ int get_utf8_char_length(uint8_t ch)
     }
     
     return 1; 
+}
+
+static inline bool is_deleted(int32_t content_index)
+{
+    return (terminal_info.delete_buffer_screen_end_index != -1 && content_index >= (terminal_info.delete_buffer_screen_end_index - terminal_info.delete_buffer_len) && content_index < terminal_info.delete_buffer_screen_end_index);
 }

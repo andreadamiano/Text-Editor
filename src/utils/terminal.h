@@ -51,6 +51,8 @@ void read_input();
 int8_t write_to_tmp_buffer(uint32_t index, uint8_t ch); 
 void add_to_delete_buffer(uint32_t index); 
 void flush_tmp_buffer();
+void flush_delete_buffer();
 int get_utf8_char_length(uint8_t ch);
+static inline bool is_deleted(int32_t content_index);
 
 #endif
