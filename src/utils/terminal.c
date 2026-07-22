@@ -24,6 +24,7 @@ void register_resize_handler()
 
 void put_terminal_raw()
 {
+    //open alternate terminal
     printf("\e[?1049h\e[H");
     fflush(stdout);
 
@@ -62,6 +63,7 @@ void restore_old_terminal()
     //restore original terminal settings 
     tcsetattr(STDIN_FILENO, TCSANOW, &terminal_info.orig_termios);
 
+    //close alternate terminal
     printf("\e[?1049l");
     fflush(stdout);
 }
@@ -125,7 +127,6 @@ void render_file_content()
                     if (col < terminal_info.terminal_size.ws_col || ch == '\n')
                     {
                         putchar(ch);
-                        fflush(stdout);
                     }
 
                     terminal_info.displayed_content[content_index++] = ch;
@@ -145,7 +146,6 @@ void render_file_content()
             //display leaf nodes of the b-tree
             ch = consume_char_from_node(&current_node, &node_index);
             putchar(ch);
-            fflush(stdout);
             terminal_info.displayed_content[content_index++] = ch;
 
             if (ch == '\0')
@@ -177,6 +177,10 @@ void render_file_content()
                 goto end;
             
             terminal_info.displayed_content[content_index++] = ch;
+
+            //always render the newline even if its out of screen
+            if (ch == '\n')
+                putchar(ch);
         }
 
         terminal_info.displayed_cols[current_row] = content_index;
@@ -340,7 +344,7 @@ void read_input()
     
 }
 
-int8_t write_to_tmp_buffer(uint8_t index, uint8_t ch)
+int8_t write_to_tmp_buffer(uint32_t index, uint8_t ch)
 {
     //if the tmp buffer is empty add to it
     if (terminal_info.tmp_buffer_screen_index == -1)
@@ -385,14 +389,14 @@ int8_t write_to_tmp_buffer(uint8_t index, uint8_t ch)
         }
         else
         {
-            terminal_info.row_offset = MAX(terminal_info.line_size + 1 - terminal_info.terminal_size.ws_col - terminal_info.cursor_col, 0);
+            terminal_info.row_offset = 0;
             terminal_info.cursor_col = 0;
             terminal_info.cursor_row = MIN(terminal_info.cursor_row + 1, terminal_info.terminal_size.ws_row);
         }
     }
 }
 
-void add_to_delete_buffer(uint8_t index)
+void add_to_delete_buffer(uint32_t index)
 {
     char current_char;
     int char_len = 0;

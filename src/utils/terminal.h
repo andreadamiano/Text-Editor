@@ -13,11 +13,11 @@ typedef struct
     struct winsize terminal_size;
     uint8_t cursor_row;
     uint8_t cursor_col; 
-    uint8_t content_index;
-    uint8_t content_size;
+    int32_t content_index;
+    uint32_t content_size;
     uint8_t* displayed_content;
     int32_t* displayed_cols;
-    uint8_t row_offset;
+    int32_t row_offset;
     volatile sig_atomic_t screen_resized; //sig_atomic_t ensure that the varible is an integer type of a size that cna be accessed by the CPU in a single instruction
     Arena_t* scratch_arena;
     uint8_t tmp_buffer[MAX_FILE_READ_CHUNK];
@@ -37,8 +37,8 @@ void restore_old_terminal();
 void handle_resize(int sig);
 void register_resize_handler(); 
 void read_input(); 
-int8_t write_to_tmp_buffer(uint8_t index, uint8_t ch); 
-void add_to_delete_buffer(uint8_t index); 
+int8_t write_to_tmp_buffer(uint32_t index, uint8_t ch); 
+void add_to_delete_buffer(uint32_t index); 
 void flush_tmp_buffer();
 int get_utf8_char_length(uint8_t ch);
 
