@@ -459,21 +459,21 @@ void add_to_delete_buffer(uint32_t index)
         if (terminal_info.delete_buffer_screen_end_index == -1)
         {
             terminal_info.delete_buffer_screen_end_index = index;
-            terminal_info.delete_buffer_len = 1;
+            terminal_info.delete_buffer_len = char_len;
         }
         else
         {        
             //if the user delete a new index, which is not where the current delete buffer point or the delete buffer is full flush it
-            if (index < terminal_info.delete_buffer_screen_end_index - terminal_info.delete_buffer_len || index >= terminal_info.delete_buffer_screen_end_index || terminal_info.delete_buffer_len + 1 > MAX_FILE_READ_CHUNK)
+            if (index < terminal_info.delete_buffer_screen_end_index - terminal_info.delete_buffer_len || index >= terminal_info.delete_buffer_screen_end_index || terminal_info.delete_buffer_len + char_len > MAX_FILE_READ_CHUNK)
             {
                 delete_string(terminal_info.delete_buffer_screen_end_index + file_info.curr_index, terminal_info.delete_buffer_len); 
                 terminal_info.delete_buffer_screen_end_index = index;
-                terminal_info.delete_buffer_len = 1;
+                terminal_info.delete_buffer_len = char_len;
             }
             //append to the delete buffer
             else
             {
-                ++terminal_info.delete_buffer_len;
+                terminal_info.delete_buffer_len += char_len;
             }
         }
     }
