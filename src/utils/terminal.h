@@ -20,7 +20,7 @@ typedef struct
     uint32_t content_size;
     uint8_t* displayed_content;
     int32_t* displayed_cols;
-    int32_t row_offset;
+    int32_t byte_offset;
     volatile sig_atomic_t screen_resized; //sig_atomic_t ensure that the varible is an integer type of a size that cna be accessed by the CPU in a single instruction
 
     //temporary arena, to store temporary informations overwritten every rendering cycle

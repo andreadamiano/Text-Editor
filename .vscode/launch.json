@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "C/C++ Debugger",
+      "name": "Linux Env",
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/build/main",
@@ -12,6 +12,14 @@
       "environment": [],
       "externalConsole": false, 
       "MIMode": "gdb",
+    },
+    {
+      "name": "WSL Env",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/main",
+      "args": ["./tests/prova.txt"],
+      "cwd": "${workspaceFolder}"
     }
   ]
 }

@@ -42,7 +42,7 @@ void put_terminal_raw()
     //initialize terminal position
     terminal_info.cursor_col = 0;
     terminal_info.cursor_row = 0;
-    terminal_info.row_offset = 0;
+    terminal_info.byte_offset = 0;
     terminal_info.content_index = 0;
     terminal_info.tmp_buffer_index = 0;
     terminal_info.tmp_buffer_screen_index = -1;
@@ -98,30 +98,35 @@ void render_file_content()
     int tmp_index = 0;
     bool skip = false;
     int current_col = 0;
-    int skip_col = 0;
+    int skipped_bytes = 0;
 
     while (current_row < terminal_info.terminal_size.ws_row)
     {   
         current_col = 0;      
-        skip_col = 0;
+        skipped_bytes = 0;
         skip = false;
         while (current_col < terminal_info.terminal_size.ws_col)
         {
             //skip not visible part of the current row
-            while (skip_col < terminal_info.row_offset)
+            while (skipped_bytes < terminal_info.byte_offset)
             {
-                ++skip_col;
                 ch = consume_char_from_node(&current_node, &node_index);
-                terminal_info.displayed_content[displayed_content_index++] = ch;
-
-                if (ch == '\0')
-                    goto end;
+                if (ch == '\0') goto end;
                 
-                if (ch == '\n' && !is_deleted(content_index))
+                //skip only not soft delete characters
+                if (!is_deleted(content_index))
                 {
-                    putchar('\n');
-                    goto end_loop;
+                    terminal_info.displayed_content[displayed_content_index++] = ch;
+
+                    if (ch == '\n' && !is_deleted(content_index))
+                    {
+                        putchar('\n');
+                        goto end_loop;
+                    }
+
+                    ++skipped_bytes;
                 }
+
                 ++content_index;
             }
 
@@ -262,13 +267,13 @@ void read_input()
                         {
                             terminal_info.cursor_row = MAX(terminal_info.cursor_row - 1, 0);
                             terminal_info.cursor_col = MIN(terminal_info.prev_line_size, terminal_info.terminal_size.ws_col-1);
-                            terminal_info.row_offset = MAX(terminal_info.prev_line_size - terminal_info.terminal_size.ws_col+1,0);
+                            terminal_info.byte_offset = MAX(terminal_info.prev_line_size - terminal_info.terminal_size.ws_col+1,0);
                             break;
                         }
 
                         if (terminal_info.cursor_col <= 0) 
                         {
-                            terminal_info.row_offset = MAX(terminal_info.row_offset - 1, 0);
+                            terminal_info.byte_offset = MAX(terminal_info.byte_offset - char_len, 0);
                         }
                         else
                         {
@@ -287,7 +292,7 @@ void read_input()
 
                         if (current_char == '\n' )
                         {
-                            terminal_info.row_offset = 0;
+                            terminal_info.byte_offset = 0;
                             terminal_info.cursor_row +=  1;
                             terminal_info.cursor_col = 0;
                             terminal_info.content_index = MIN(terminal_info.content_index + char_len, terminal_info.content_size);
@@ -298,7 +303,7 @@ void read_input()
 
                         if (terminal_info.cursor_col >= terminal_info.terminal_size.ws_col - 1) 
                         {
-                            terminal_info.row_offset = terminal_info.row_offset + 1;
+                            terminal_info.byte_offset = terminal_info.byte_offset + char_len;
                         }
                         else
                         {
@@ -319,7 +324,7 @@ void read_input()
                             terminal_info.content_index -= MAX(terminal_info.prev_line_size + 1, terminal_info.cursor_col + 1);
                             terminal_info.cursor_row = MAX(terminal_info.cursor_row - 1, 0);
                             terminal_info.cursor_col = MIN(terminal_info.cursor_col, terminal_info.prev_line_size);
-                            terminal_info.row_offset = MAX(terminal_info.content_index - terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.terminal_size.ws_col,0);
+                            terminal_info.byte_offset = MAX(terminal_info.content_index - terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.terminal_size.ws_col,0);
                         } 
                         break;
                         
@@ -338,7 +343,7 @@ void read_input()
                                 terminal_info.content_index += MIN(terminal_info.line_size + 1, terminal_info.displayed_cols[terminal_info.cursor_row] - terminal_info.content_index + terminal_info.next_line_size);
                                 terminal_info.cursor_row = MIN(terminal_info.cursor_row + 1, terminal_info.terminal_size.ws_row);
                                 terminal_info.cursor_col = MIN(terminal_info.cursor_col, terminal_info.next_line_size);
-                                terminal_info.row_offset = MAX(terminal_info.content_index - terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.terminal_size.ws_col ,0);
+                                terminal_info.byte_offset = MAX(terminal_info.content_index - terminal_info.displayed_cols[terminal_info.cursor_row-1] - terminal_info.terminal_size.ws_col ,0);
                             }
                         } 
                         break;
@@ -408,14 +413,14 @@ int8_t write_to_tmp_buffer(uint32_t index, uint8_t ch)
             //check if the cursor is at the end of the terminal window
             if (terminal_info.cursor_col + 1 >= terminal_info.terminal_size.ws_col)
             {
-                terminal_info.row_offset = MAX(terminal_info.line_size + 2 - terminal_info.terminal_size.ws_col, 0);    
+                terminal_info.byte_offset = MAX(terminal_info.line_size + 2 - terminal_info.terminal_size.ws_col, 0);    
             }
 
             terminal_info.cursor_col = MIN(terminal_info.cursor_col + 1, terminal_info.terminal_size.ws_col-1);
         }
         else
         {
-            terminal_info.row_offset = 0;
+            terminal_info.byte_offset = 0;
             terminal_info.cursor_col = 0;
             terminal_info.cursor_row = MIN(terminal_info.cursor_row + 1, terminal_info.terminal_size.ws_row);
         }
@@ -478,12 +483,12 @@ void add_to_delete_buffer(uint32_t index)
     {
         terminal_info.cursor_row = MAX(terminal_info.cursor_row - 1, 0);
         terminal_info.cursor_col = MIN(terminal_info.prev_line_size, terminal_info.terminal_size.ws_col-1);
-        terminal_info.row_offset = MAX(terminal_info.prev_line_size - terminal_info.terminal_size.ws_col+1,0);
+        terminal_info.byte_offset = MAX(terminal_info.prev_line_size - terminal_info.terminal_size.ws_col+1,0);
     }
     else
     {
-        terminal_info.cursor_col = MAX(MIN(terminal_info.cursor_col + terminal_info.row_offset - 1, terminal_info.terminal_size.ws_col-1), 0);
-        terminal_info.row_offset = MAX(terminal_info.row_offset - 1, 0);
+        terminal_info.cursor_col = MAX(MIN(terminal_info.cursor_col + terminal_info.byte_offset - 1, terminal_info.terminal_size.ws_col-1), 0);
+        terminal_info.byte_offset = MAX(terminal_info.byte_offset - 1, 0);
     }
 
     //if the tmp buffer was completely emptied signal it (by putting the index to a default -1)
